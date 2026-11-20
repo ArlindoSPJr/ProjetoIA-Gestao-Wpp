@@ -102,6 +102,14 @@ class CarrinhoServiceTest {
     }
 
     @Test
+    void reiniciarTudoLimpaCarrinhosERestauraEstoque() {
+        carrinho.adicionar(TEL, "P001", 2);
+        carrinho.reiniciarTudo();
+        assertThat(carrinho.ver(TEL).itens()).isEmpty();
+        assertThat(estoque.consultar("P001")).isEqualTo(12);
+    }
+
+    @Test
     void itemSerializaSubtotal() {
         assertThat(mapper.writeValueAsString(carrinho.adicionar(TEL, "P001", 2)))
                 .contains("\"subtotal\":99.80", "\"total\":99.80");

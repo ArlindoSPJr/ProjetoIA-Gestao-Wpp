@@ -28,6 +28,8 @@ Demo do simulador (precisa de `ANTHROPIC_API_KEY`):
 $env:ANTHROPIC_API_KEY="..."; .\mvnw.cmd spring-boot:run   # depois abrir http://localhost:8080
 ```
 
+Se o bot só responder "vou chamar um atendente", confira a ANTHROPIC_API_KEY e os logs (log.warn do AgenteClaude mostra o erro).
+
 Modelo, effort e limite de iterações do agente ficam no bloco `agente:` do `application.yaml`.
 
 Plano da demo: `docs/superpowers/plans/2026-11-20-demo-agente-atendimento.md` (spec em `docs/superpowers/specs/`).

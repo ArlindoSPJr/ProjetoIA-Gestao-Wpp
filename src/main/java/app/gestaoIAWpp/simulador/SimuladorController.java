@@ -56,8 +56,7 @@ public class SimuladorController {
     @PostMapping("/reset")
     public ResponseEntity<Void> reset() {
         agente.reiniciarConversas();
-        carrinho.limparTodos();
-        estoque.reiniciar();
+        carrinho.reiniciarTudo();
         return ResponseEntity.noContent().build();
     }
 

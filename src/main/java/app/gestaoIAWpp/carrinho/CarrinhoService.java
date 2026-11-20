@@ -69,6 +69,12 @@ public class CarrinhoService {
         carrinhos.clear();
     }
 
+    /** Limpa os carrinhos e reinicia o estoque na mesma seção crítica, para um adicionar não cair no meio. */
+    public synchronized void reiniciarTudo() {
+        carrinhos.clear();
+        estoque.reiniciar();
+    }
+
     private CarrinhoResumo resumir(Map<String, ItemCarrinho> itens) {
         var lista = new ArrayList<>(itens.values());
         BigDecimal total = lista.stream()

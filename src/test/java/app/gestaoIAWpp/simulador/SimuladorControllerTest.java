@@ -74,8 +74,7 @@ class SimuladorControllerTest {
     void resetReiniciaTudoERetorna204() throws Exception {
         mvc.perform(post("/api/simulador/reset")).andExpect(status().isNoContent());
         verify(agente).reiniciarConversas();
-        verify(carrinho).limparTodos();
-        verify(estoque).reiniciar();
+        verify(carrinho).reiniciarTudo();
     }
 
     @Test

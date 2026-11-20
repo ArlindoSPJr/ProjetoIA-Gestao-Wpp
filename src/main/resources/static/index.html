@@ -164,6 +164,7 @@ async function enviar(evento) {
   adicionarBolha(texto, 'cliente');
   $('texto').value = '';
   $('enviar').disabled = true;
+  $('reiniciar').disabled = true;
   $('digitando').textContent = 'digitando...';
   try {
     const r = await fetch('/api/simulador/mensagens', {
@@ -184,6 +185,7 @@ async function enviar(evento) {
   } finally {
     $('digitando').textContent = '';
     $('enviar').disabled = false;
+    $('reiniciar').disabled = false;
     $('texto').focus();
     carregarEstado();
   }
@@ -191,9 +193,15 @@ async function enviar(evento) {
 
 async function reiniciar() {
   try {
-    await fetch('/api/simulador/reset', { method: 'POST' });
+    const r = await fetch('/api/simulador/reset', { method: 'POST' });
+    if (!r.ok) {
+      adicionarBolha('Não foi possível reiniciar a demo (erro ' + r.status + ').', 'erro-chat');
+      return;
+    }
   } catch (e) {
+    adicionarBolha('Falha de comunicação com o servidor ao reiniciar.', 'erro-chat');
     console.error('Falha ao reiniciar', e);
+    return;
   }
   $('chat').replaceChildren();
   mostrarChamadas([]);
