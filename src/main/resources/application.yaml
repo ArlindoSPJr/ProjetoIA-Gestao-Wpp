@@ -1,6 +1,9 @@
 spring:
   application:
     name: gestaoIAWpp
+  config:
+    # Lê variáveis locais (ex.: ANTHROPIC_API_KEY) de um .env na raiz, se existir. O .env não vai para o git.
+    import: optional:file:.env[.properties]
   autoconfigure:
     # Temporário: sem PostgreSQL nesta fase (dados em memória). Remover quando o banco entrar.
     exclude:

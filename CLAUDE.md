@@ -22,10 +22,10 @@ Use o Maven Wrapper (`./mvnw` no Bash, `.\mvnw.cmd` no PowerShell):
 
 O banco está desligado temporariamente via `spring.autoconfigure.exclude` (dados em memória); os testes rodam sem PostgreSQL e sem chave da Anthropic (o `AnthropicClient` é mockado nos testes; nenhum teste chama a API real).
 
-Demo do simulador (precisa de `ANTHROPIC_API_KEY`):
+Demo do simulador (precisa de `ANTHROPIC_API_KEY`): copie `.env.example` para `.env` (ignorado pelo git) e preencha a chave, ou exporte a variável de ambiente. O Spring importa o `.env` via `spring.config.import` e o `AnthropicConfig` repassa a chave ao SDK.
 
 ```powershell
-$env:ANTHROPIC_API_KEY="..."; .\mvnw.cmd spring-boot:run   # depois abrir http://localhost:8080
+.\mvnw.cmd spring-boot:run   # depois abrir http://localhost:8080
 ```
 
 Se o bot só responder "vou chamar um atendente", confira a ANTHROPIC_API_KEY e os logs (log.warn do AgenteClaude mostra o erro).
