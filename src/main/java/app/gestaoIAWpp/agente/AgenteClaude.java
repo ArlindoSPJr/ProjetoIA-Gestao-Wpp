@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,12 @@ public class AgenteClaude implements AgenteAtendimento {
     /** Um lock por telefone: dois turnos do mesmo cliente não podem sobrescrever o histórico um do outro. */
     private final Map<String, Object> locks = new ConcurrentHashMap<>();
 
+    /**
+     * Geração do histórico, incrementada a cada reset. Um turno em andamento trabalha numa cópia do
+     * histórico anterior ao reset; sem esta checagem ele a gravaria de volta e ressuscitaria a conversa.
+     */
+    private final AtomicLong geracao = new AtomicLong();
+
     public AgenteClaude(AnthropicClient client, FerramentasAgente ferramentas, AgenteProperties props,
                         JsonMapper mapper) {
         this.client = client;
@@ -77,10 +84,12 @@ public class AgenteClaude implements AgenteAtendimento {
 
     @Override
     public void reiniciarConversas() {
+        geracao.incrementAndGet();
         historico.clear();
     }
 
     private RespostaAgente executarTurno(String telefone, String mensagem) {
+        long geracaoDoTurno = geracao.get();
         // Trabalha numa cópia: o histórico só é substituído se o turno terminar bem.
         List<MessageParam> turno = new ArrayList<>(historico.getOrDefault(telefone, List.of()));
         turno.add(MessageParam.ofUser(mensagem));
@@ -99,7 +108,10 @@ public class AgenteClaude implements AgenteAtendimento {
                         log.warn("Turno de {} terminou em end_turn sem texto.", telefone);
                         return fallback(chamadas);
                     }
-                    historico.put(telefone, turno);
+                    // Se houve reset durante o turno, a resposta vai ao cliente mas o histórico antigo não volta.
+                    if (geracao.get() == geracaoDoTurno) {
+                        historico.put(telefone, turno);
+                    }
                     return new RespostaAgente(texto, chamadas);
                 }
                 if (!StopReason.TOOL_USE.equals(stopReason)) {

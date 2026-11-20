@@ -159,6 +159,52 @@ class AgenteClaudeTest {
         assertThat(capturarRequisicoes(2).get(1).messages()).hasSize(1);
     }
 
+    @Test
+    void requisicaoLevaModeloPromptETools() {
+        when(client.messages().create(any(MessageCreateParams.class))).thenReturn(respostaTexto("olá"));
+
+        agente.responder(TEL, "oi");
+
+        MessageCreateParams params = capturarRequisicoes(1).get(0);
+        assertThat(params.model().asString()).isEqualTo("claude-haiku-5-5");
+        assertThat(params.maxTokens()).isEqualTo(16000L);
+        assertThat(params.system()).isPresent();
+        assertThat(params.system().get().asString()).isNotBlank();
+        assertThat(params.tools()).isPresent();
+        assertThat(params.tools().get()).hasSize(5);
+    }
+
+    @Test
+    void historicoLimpoAposEstourarLimite() {
+        when(client.messages().create(any(MessageCreateParams.class)))
+                .thenReturn(respostaToolUse("t", "ver_carrinho", Map.of()),
+                        respostaToolUse("t", "ver_carrinho", Map.of()),
+                        respostaToolUse("t", "ver_carrinho", Map.of()),
+                        respostaToolUse("t", "ver_carrinho", Map.of()),
+                        respostaToolUse("t", "ver_carrinho", Map.of()),
+                        respostaTexto("olá"));
+
+        assertThat(agente.responder(TEL, "oi").texto()).isEqualTo(AgenteClaude.MENSAGEM_FALLBACK);
+        assertThat(agente.responder(TEL, "oi de novo").texto()).isEqualTo("olá");
+
+        assertThat(capturarRequisicoes(6).get(5).messages()).hasSize(1);
+    }
+
+    @Test
+    void resetDuranteTurnoNaoRessuscitaConversa() {
+        when(client.messages().create(any(MessageCreateParams.class)))
+                .thenAnswer(inv -> {
+                    agente.reiniciarConversas();
+                    return respostaTexto("olá");
+                })
+                .thenReturn(respostaTexto("de novo"));
+
+        assertThat(agente.responder(TEL, "oi").texto()).isEqualTo("olá");
+        agente.responder(TEL, "oi outra vez");
+
+        assertThat(capturarRequisicoes(2).get(1).messages()).hasSize(1);
+    }
+
     private List<MessageCreateParams> capturarRequisicoes(int quantidade) {
         var captor = ArgumentCaptor.forClass(MessageCreateParams.class);
         verify(client.messages(), times(quantidade)).create(captor.capture());
