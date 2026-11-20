@@ -20,9 +20,27 @@ Use o Maven Wrapper (`./mvnw` no Bash, `.\mvnw.cmd` no PowerShell):
 ./mvnw clean package                         # gera o jar em target/
 ```
 
-O banco está desligado temporariamente via `spring.autoconfigure.exclude` (dados em memória); os testes rodam sem PostgreSQL.
+O banco está desligado temporariamente via `spring.autoconfigure.exclude` (dados em memória); os testes rodam sem PostgreSQL e sem chave da Anthropic (o `AnthropicClient` é mockado nos testes; nenhum teste chama a API real).
 
-Plano em execução: `docs/superpowers/plans/2026-11-20-demo-agente-atendimento.md`.
+Demo do simulador (precisa de `ANTHROPIC_API_KEY`):
+
+```powershell
+$env:ANTHROPIC_API_KEY="..."; .\mvnw.cmd spring-boot:run   # depois abrir http://localhost:8080
+```
+
+Modelo, effort e limite de iterações do agente ficam no bloco `agente:` do `application.yaml`.
+
+Plano da demo: `docs/superpowers/plans/2026-11-20-demo-agente-atendimento.md` (spec em `docs/superpowers/specs/`).
+
+## Estrutura da demo (pacotes sob `app.gestaoIAWpp`)
+
+- `produto/`: `CatalogoMock` (8 produtos e estoque inicial em memória), `ProdutoRepository` + `ProdutoRepositoryEmMemoria` (busca por pontuação, tolerante a acento e pontuação), `EstoqueService` (baixa/devolução atômicas).
+- `carrinho/`: `CarrinhoService`, um carrinho por telefone; adicionar baixa o estoque, remover devolve.
+- `agente/`: `AgenteAtendimento` (a porta da IA), `AgenteClaude` (loop manual da Messages API com histórico por telefone), `FerramentasAgente` (definição das 5 tools e despacho; nunca lança exceção), prompt em `src/main/resources/prompts/sistema-atendimento.txt`.
+- `atendimento/`: `AtendimentoService.processarMensagem(telefone, texto)`, entrada agnóstica de canal (o futuro webhook do WhatsApp chama o mesmo serviço).
+- `simulador/`: endpoints REST `/api/simulador/*` e a página `src/main/resources/static/index.html`.
+
+Duas versões do Jackson convivem: o SDK da Anthropic usa Jackson 2 internamente (a entrada das tools é lida com `JsonValue.convert(...)`); o resto do projeto usa o Jackson 3 do Boot 4 (`tools.jackson`). Não passe objetos do SDK para o `JsonMapper`.
 
 ## Stack
 
