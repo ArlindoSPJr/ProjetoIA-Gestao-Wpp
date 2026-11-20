@@ -1,3 +1,17 @@
 spring:
   application:
     name: gestaoIAWpp
+  config:
+    # Lê variáveis locais (ex.: ANTHROPIC_API_KEY) de um .env na raiz, se existir. O .env não vai para o git.
+    import: optional:file:.env[.properties]
+  autoconfigure:
+    # Temporário: sem PostgreSQL nesta fase (dados em memória). Remover quando o banco entrar.
+    exclude:
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
+      - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+
+agente:
+  modelo: claude-haiku-5-5
+  effort: low
+  max-iteracoes: 5
