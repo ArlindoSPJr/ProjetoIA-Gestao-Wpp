@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Atendimento</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #e5ddd5; color: #222; }
+  header { background: #075e54; color: #fff; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  header h1 { font-size: 18px; margin: 0; }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; height: calc(100vh - 52px); }
+  section.painel { background: #fff; border-radius: 8px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+  .esquerda { display: flex; flex-direction: column; min-height: 0; }
+  .direita { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; min-height: 0; }
+  .telefone { margin-bottom: 8px; }
+  .telefone input { padding: 6px; width: 180px; }
+  #chat { flex: 1; overflow-y: auto; background: #efeae2; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-height: 200px; }
+  .bolha { max-width: 80%; padding: 8px 10px; border-radius: 8px; white-space: pre-wrap; word-wrap: break-word; }
+  .cliente { align-self: flex-end; background: #d9fdd3; }
+  .bot { align-self: flex-start; background: #fff; }
+  .erro-chat { align-self: flex-start; background: #fdd; }
+  #digitando { font-size: 13px; color: #666; height: 18px; margin: 4px 0; font-style: italic; }
+  .envio { display: flex; gap: 6px; }
+  .envio input { flex: 1; padding: 8px; }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; background: #128c7e; color: #fff; cursor: pointer; }
+  button:disabled { opacity: .6; cursor: default; }
+  button.perigo { background: #b3261e; }
+  h2 { font-size: 15px; margin: 0 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #eee; }
+  td.num, th.num { text-align: right; }
+  tr.zerado td { background: #fde2e2; font-weight: bold; }
+  .total { text-align: right; font-weight: bold; margin-top: 6px; }
+  .vazio { color: #888; font-size: 14px; }
+  .chamada { border: 1px solid #ddd; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 13px; }
+  .chamada .nome { font-weight: bold; }
+  .chamada pre { margin: 2px 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; }
+  .chamada.erro pre.resultado, .chamada.erro .nome { color: #b3261e; }
+  @media (max-width: 767px) {
+    main { grid-template-columns: 1fr; height: auto; }
+    #chat { min-height: 300px; max-height: 60vh; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Simulador de Atendimento (WhatsApp)</h1>
+  <button id="reiniciar" class="perigo" type="button">Reiniciar demo</button>
+</header>
+<main>
+  <section class="painel esquerda">
+    <div class="telefone">
+      <label>Telefone <input id="telefone" type="text" value="5511999990000"></label>
+    </div>
+    <div id="chat"></div>
+    <div id="digitando"></div>
+    <form class="envio" id="form">
+      <input id="texto" type="text" placeholder="Digite uma mensagem" autocomplete="off">
+      <button id="enviar" type="submit">Enviar</button>
+    </form>
+  </section>
+  <div class="direita">
+    <section class="painel">
+      <h2>Carrinho</h2>
+      <div id="carrinho"></div>
+    </section>
+    <section class="painel">
+      <h2>Estoque</h2>
+      <div id="estoque"></div>
+    </section>
+    <section class="painel">
+      <h2>Chamadas de ferramenta do último turno</h2>
+      <div id="chamadas"><span class="vazio">Nenhuma chamada ainda.</span></div>
+    </section>
+  </div>
+</main>
+<script>
+const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const $ = id => document.getElementById(id);
+
+function el(tag, texto, classe) {
+  const e = document.createElement(tag);
+  if (texto !== undefined && texto !== null) e.textContent = texto;
+  if (classe) e.className = classe;
+  return e;
+}
+
+function adicionarBolha(texto, classe) {
+  const b = el('div', texto, 'bolha ' + classe);
+  $('chat').appendChild(b);
+  $('chat').scrollTop = $('chat').scrollHeight;
+}
+
+function tabela(colunas, linhas, classeLinha) {
+  const t = el('table');
+  const cab = el('tr');
+  colunas.forEach(c => cab.appendChild(el('th', c.titulo, c.num ? 'num' : '')));
+  t.appendChild(cab);
+  linhas.forEach(l => {
+    const tr = el('tr', null, classeLinha ? classeLinha(l) : '');
+    colunas.forEach(c => tr.appendChild(el('td', c.valor(l), c.num ? 'num' : '')));
+    t.appendChild(tr);
+  });
+  return t;
+}
+
+function mostrarEstado(estado) {
+  const carrinho = $('carrinho');
+  carrinho.replaceChildren();
+  const itens = (estado.carrinho && estado.carrinho.itens) || [];
+  if (itens.length === 0) {
+    carrinho.appendChild(el('span', 'Carrinho vazio.', 'vazio'));
+  } else {
+    carrinho.appendChild(tabela([
+      { titulo: 'Produto', valor: i => i.nome },
+      { titulo: 'Preço', valor: i => brl.format(i.precoUnitario), num: true },
+      { titulo: 'Qtd', valor: i => i.quantidade, num: true },
+      { titulo: 'Subtotal', valor: i => brl.format(i.subtotal), num: true }
+    ], itens));
+  }
+  carrinho.appendChild(el('div', 'Total: ' + brl.format((estado.carrinho && estado.carrinho.total) || 0), 'total'));
+
+  const estoque = $('estoque');
+  estoque.replaceChildren();
+  estoque.appendChild(tabela([
+    { titulo: 'Produto', valor: p => p.nome },
+    { titulo: 'Preço', valor: p => brl.format(p.preco), num: true },
+    { titulo: 'Qtd', valor: p => p.quantidade, num: true }
+  ], estado.estoque || [], p => p.quantidade === 0 ? 'zerado' : ''));
+}
+
+function mostrarChamadas(chamadas) {
+  const div = $('chamadas');
+  div.replaceChildren();
+  if (!chamadas || chamadas.length === 0) {
+    div.appendChild(el('span', 'Nenhuma chamada neste turno.', 'vazio'));
+    return;
+  }
+  chamadas.forEach(c => {
+    const box = el('div', null, 'chamada' + (c.erro ? ' erro' : ''));
+    box.appendChild(el('div', c.nome, 'nome'));
+    box.appendChild(el('pre', 'Entrada: ' + c.entradaJson));
+    box.appendChild(el('pre', 'Resultado: ' + c.resultadoJson, 'resultado'));
+    div.appendChild(box);
+  });
+}
+
+async function carregarEstado() {
+  try {
+    const r = await fetch('/api/simulador/estado?telefone=' + encodeURIComponent($('telefone').value.trim()));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    mostrarEstado(await r.json());
+  } catch (e) {
+    console.error('Falha ao carregar estado', e);
+  }
+}
+
+async function enviar(evento) {
+  evento.preventDefault();
+  const texto = $('texto').value.trim();
+  const telefone = $('telefone').value.trim();
+  if (!texto) return;
+  adicionarBolha(texto, 'cliente');
+  $('texto').value = '';
+  $('enviar').disabled = true;
+  $('digitando').textContent = 'digitando...';
+  try {
+    const r = await fetch('/api/simulador/mensagens', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefone, texto })
+    });
+    const corpo = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      adicionarBolha(corpo.erro || ('Erro ' + r.status), 'erro-chat');
+    } else {
+      adicionarBolha(corpo.texto, 'bot');
+      mostrarChamadas(corpo.chamadas);
+    }
+  } catch (e) {
+    adicionarBolha('Falha de comunicação com o servidor.', 'erro-chat');
+    console.error(e);
+  } finally {
+    $('digitando').textContent = '';
+    $('enviar').disabled = false;
+    $('texto').focus();
+    carregarEstado();
+  }
+}
+
+async function reiniciar() {
+  try {
+    await fetch('/api/simulador/reset', { method: 'POST' });
+  } catch (e) {
+    console.error('Falha ao reiniciar', e);
+  }
+  $('chat').replaceChildren();
+  mostrarChamadas([]);
+  carregarEstado();
+}
+
+$('form').addEventListener('submit', enviar);
+$('reiniciar').addEventListener('click', reiniciar);
+carregarEstado();
+</script>
+</body>
+</html>
