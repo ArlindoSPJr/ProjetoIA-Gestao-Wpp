@@ -26,6 +26,8 @@ public class FerramentasAgente {
     static final int LIMITE_RESULTADOS_BUSCA = 5;
 
     private static final String DESCRICAO_PRODUTO_ID = "Id do produto retornado por consultar_produto.";
+    private static final String MENSAGEM_ERRO_PADRAO = "Erro inesperado ao executar a ferramenta.";
+    private static final String JSON_ERRO_FIXO = "{\"erro\":\"" + MENSAGEM_ERRO_PADRAO + "\"}";
     private static final String ERRO_QUANTIDADE =
             "Parâmetro inválido: quantidade deve ser um número inteiro maior que zero.";
 
@@ -183,7 +185,12 @@ public class FerramentasAgente {
     }
 
     private ResultadoFerramenta erro(String mensagem) {
-        return new ResultadoFerramenta(mapper.writeValueAsString(Map.of("erro", mensagem)), true);
+        String texto = (mensagem == null || mensagem.isBlank()) ? MENSAGEM_ERRO_PADRAO : mensagem;
+        try {
+            return new ResultadoFerramenta(mapper.writeValueAsString(Map.of("erro", texto)), true);
+        } catch (RuntimeException e) {
+            return new ResultadoFerramenta(JSON_ERRO_FIXO, true);
+        }
     }
 
     private static Tool tool(String nome, String descricao, Tool.InputSchema.Properties props,

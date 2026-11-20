@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import app.gestaoIAWpp.carrinho.CarrinhoService;
 import app.gestaoIAWpp.produto.EstoqueService;
+import app.gestaoIAWpp.produto.Produto;
+import app.gestaoIAWpp.produto.ProdutoEncontrado;
+import app.gestaoIAWpp.produto.ProdutoRepository;
 import app.gestaoIAWpp.produto.ProdutoRepositoryEmMemoria;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -113,5 +117,36 @@ class FerramentasAgenteTest {
         ferramentas.executar(TEL, "adicionar_ao_carrinho", Map.of("produto_id", "P001", "quantidade", 2));
         ferramentas.executar(TEL, "remover_do_carrinho", Map.of("produto_id", "P001"));
         assertThat(carrinho.ver(TEL).itens()).isEmpty();
+    }
+
+    @Test
+    void entradaNulaViraErroSemLancar() {
+        var r = ferramentas.executar(TEL, "consultar_produto", null);
+        assertThat(r.erro()).isTrue();
+        assertThat(r.conteudoJson()).contains("\"erro\"");
+    }
+
+    @Test
+    void excecaoSemMensagemViraErroComMensagemPadrao() {
+        var repositorioQuebrado = new ProdutoRepository() {
+            @Override
+            public Optional<Produto> buscarPorId(String id) {
+                throw new IllegalStateException();
+            }
+
+            @Override
+            public List<ProdutoEncontrado> buscar(String termo) {
+                throw new IllegalStateException();
+            }
+
+            @Override
+            public List<Produto> listarTodos() {
+                throw new IllegalStateException();
+            }
+        };
+        var quebrado = new FerramentasAgente(repositorioQuebrado, estoque, carrinho, JsonMapper.builder().build());
+        var r = quebrado.executar(TEL, "consultar_produto", Map.of("termo", "camisa"));
+        assertThat(r.erro()).isTrue();
+        assertThat(r.conteudoJson()).contains("Erro inesperado ao executar a ferramenta.");
     }
 }
