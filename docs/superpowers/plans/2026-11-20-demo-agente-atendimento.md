@@ -62,7 +62,7 @@ Onda 5:  T9
 ```
 
 **Branches:**
-- T1 cria a branch de integração `feature/demo-agente` a partir de `main`.
+- A branch de integração `feature/demo-agente` já existe (criada a partir de `main`, com o plano revisado).
 - Cada tarefa roda num worktree Orca próprio, com a branch `feature/demo-agente-tN` criada a partir de `feature/demo-agente` atualizada.
 - Ao fim de cada onda, o orquestrador revisa e faz merge das branches da onda em `feature/demo-agente`, roda `./mvnw test` e só então libera a próxima onda.
 - **Exceção no gate da onda 3:** o `contextLoads` falha de propósito até a T6 criar o bean de `AgenteAtendimento`. Na onda 3 o gate é `./mvnw test -Dtest='!GestaoIaWppApplicationTests'`; a partir da onda 4 volta a ser `./mvnw test` completo.
