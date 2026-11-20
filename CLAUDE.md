@@ -20,12 +20,14 @@ Use o Maven Wrapper (`./mvnw` no Bash, `.\mvnw.cmd` no PowerShell):
 ./mvnw clean package                         # gera o jar em target/
 ```
 
-`application.yaml` ainda não configura datasource nem a chave da Anthropic. Como os starters de JPA, Flyway, pgvector e Anthropic estão no classpath, tanto a aplicação quanto o `@SpringBootTest` atual devem falhar ao iniciar até existir um PostgreSQL (com a extensão pgvector) configurado.
+O banco está desligado temporariamente via `spring.autoconfigure.exclude` (dados em memória); os testes rodam sem PostgreSQL.
+
+Plano em execução: `docs/superpowers/plans/2026-11-20-demo-agente-atendimento.md`.
 
 ## Stack
 
 - Java 21, Spring Boot 4.2.0 (starters separados no estilo do Boot 4: `spring-boot-starter-webmvc`, `spring-boot-starter-flyway` e os `*-test` correspondentes)
-- Spring AI 2.1.0-M1, um milestone gerenciado pelo BOM `spring-ai-bom`: Anthropic como modelo de chat, pgvector como vector store, vector-store advisor para RAG. Spring AI 2.x exige Boot 4, então não faça downgrade de um sem o outro.
+- Spring AI fora nesta fase: o function calling é manual com o SDK oficial `com.anthropic:anthropic-java` (volta na etapa de RAG).
 - PostgreSQL + Flyway para o schema. As migrations vão em `src/main/resources/db/migration`.
 - Pacote base: `app.gestaoIAWpp`
 
@@ -38,6 +40,6 @@ O sistema tem três camadas: chatbot (interface de conversa), agente de IA (exec
 - Preço e estoque sempre vêm de tools ou do banco, nunca do texto gerado pelo modelo. O carrinho é persistido no banco e manipulado via tools, não guardado só na memória da LLM.
 - O bot nunca coleta dados de cartão, só a preferência de forma de pagamento. Um atendente humano valida o pedido inteiro antes do pagamento.
 - Usar só a WhatsApp Cloud API oficial (nada de Baileys ou Evolution API). Pela política da Meta, o bot deve se limitar ao escopo da loja.
-- Use Spring AI ou LangChain4j, nunca os dois. O projeto está em Spring AI.
+- Nesta fase não se usa Spring AI nem LangChain4j; quando um framework entrar, será só um deles.
 
 O vocabulário de domínio é em português (pedido, carrinho, atendente, estados como `AGUARDANDO_VALIDACAO`). Mantenha esses nomes no código.
