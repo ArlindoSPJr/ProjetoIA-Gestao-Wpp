@@ -28,7 +28,7 @@ public class ProdutoRepositoryEmMemoria implements ProdutoRepository {
         if (termo == null) {
             return List.of();
         }
-        List<String> palavras = Arrays.stream(normalizar(termo).split("\\s+"))
+        List<String> palavras = Arrays.stream(normalizar(termo).split("[^\\p{L}\\p{N}]+"))
                 .filter(p -> p.length() >= 2 && !STOPWORDS.contains(p))
                 .toList();
         if (palavras.isEmpty()) {
