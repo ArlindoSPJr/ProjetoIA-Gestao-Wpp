@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado do projeto
 
-Projeto recém-gerado pelo Spring Initializr: hoje só existe a classe `GestaoIaWppApplication` e o teste `contextLoads`. O produto planejado, as decisões já tomadas e as decisões em aberto estão em `docs/contexto.md`. **Leia esse arquivo antes de propor arquitetura ou funcionalidades.** Não trate itens listados como "Propostas" ou "Decisões em aberto" como decididos; pergunte ao usuário.
+Projeto em fase inicial: uma demo do agente de atendimento está sendo construída (ver o plano abaixo). O produto planejado, as decisões já tomadas e as decisões em aberto estão em `docs/contexto.md`. **Leia esse arquivo antes de propor arquitetura ou funcionalidades.** Não trate itens listados como "Propostas" ou "Decisões em aberto" como decididos; pergunte ao usuário.
 
 É um projeto de estudos (o objetivo principal é aprender) e também portfólio para vaga júnior de backend Java. Prefira explicar o porquê das escolhas a só entregar código.
 
