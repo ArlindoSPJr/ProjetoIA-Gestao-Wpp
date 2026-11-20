@@ -75,4 +75,10 @@ class ProdutoRepositoryEmMemoriaTest {
     void listarTodosRetornaOsOito() {
         assertThat(repo.listarTodos()).hasSize(8);
     }
+
+    @Test
+    void buscaIgnoraPontuacao() {
+        assertThat(ids(repo.buscar("camisa preta?"))).containsExactly("P001", "P002", "P003", "P004");
+        assertThat(ids(repo.buscar("tênis, branco!"))).containsExactly("P007");
+    }
 }
