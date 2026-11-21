@@ -3,8 +3,8 @@ package app.gestaoIAWpp.agente;
 import java.util.List;
 
 /**
- * @param chamadas  todas as tools executadas no turno, em ordem
- * @param iteracoes cada chamada à API do turno, com envio, retorno e tools (para o simulador)
+ * @param texto     a resposta que vai ao cliente
+ * @param iteracoes cada chamada à API do turno, com finish reason, tokens e tools pedidas (para o simulador)
  */
-public record RespostaAgente(String texto, List<ChamadaFerramenta> chamadas, List<IteracaoAgente> iteracoes) {
+public record RespostaAgente(String texto, List<IteracaoTurno> iteracoes) {
 }

@@ -33,7 +33,7 @@ class FerramentasAgenteToolsTest {
         var produtos = new ProdutoRepositoryEmMemoria();
         estoque = new EstoqueService();
         carrinho = new CarrinhoService(produtos, estoque);
-        ferramentas = new FerramentasAgente(new ProdutoService(produtos, estoque), carrinho, JsonMapper.builder().build());
+        ferramentas = new FerramentasAgente(new ProdutoService(produtos, estoque), carrinho);
         ctx = new ToolContext(Map.of(CHAVE_TELEFONE, TEL));
     }
 
