@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import app.gestaoIAWpp.carrinho.CarrinhoService;
 import app.gestaoIAWpp.produto.EstoqueService;
 import app.gestaoIAWpp.produto.ProdutoRepositoryEmMemoria;
+import app.gestaoIAWpp.produto.ProdutoService;
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.core.JsonValue;
 import com.anthropic.models.messages.ContentBlock;
@@ -46,7 +47,7 @@ class AgenteClaudeTest {
         estoque = new EstoqueService();
         var carrinho = new CarrinhoService(produtos, estoque);
         var mapper = JsonMapper.builder().build();
-        var ferramentas = new FerramentasAgente(produtos, estoque, carrinho, mapper);
+        var ferramentas = new FerramentasAgente(new ProdutoService(produtos, estoque), carrinho, mapper);
         agente = new AgenteClaude(client, ferramentas, new AgenteProperties("claude-haiku-5-5", "low", 5), mapper);
     }
 

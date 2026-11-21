@@ -8,6 +8,7 @@ import app.gestaoIAWpp.produto.Produto;
 import app.gestaoIAWpp.produto.ProdutoEncontrado;
 import app.gestaoIAWpp.produto.ProdutoRepository;
 import app.gestaoIAWpp.produto.ProdutoRepositoryEmMemoria;
+import app.gestaoIAWpp.produto.ProdutoService;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,7 +29,7 @@ class FerramentasAgenteTest {
         var produtos = new ProdutoRepositoryEmMemoria();
         estoque = new EstoqueService();
         carrinho = new CarrinhoService(produtos, estoque);
-        ferramentas = new FerramentasAgente(produtos, estoque, carrinho, JsonMapper.builder().build());
+        ferramentas = new FerramentasAgente(new ProdutoService(produtos, estoque), carrinho, JsonMapper.builder().build());
     }
 
     @Test
@@ -144,7 +145,7 @@ class FerramentasAgenteTest {
                 throw new IllegalStateException();
             }
         };
-        var quebrado = new FerramentasAgente(repositorioQuebrado, estoque, carrinho, JsonMapper.builder().build());
+        var quebrado = new FerramentasAgente(new ProdutoService(repositorioQuebrado, estoque), carrinho, JsonMapper.builder().build());
         var r = quebrado.executar(TEL, "consultar_produto", Map.of("termo", "camisa"));
         assertThat(r.erro()).isTrue();
         assertThat(r.conteudoJson()).contains("Erro inesperado ao executar a ferramenta.");
