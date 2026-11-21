@@ -12,6 +12,7 @@ import app.gestaoIAWpp.carrinho.CarrinhoService;
 import app.gestaoIAWpp.produto.EstoqueService;
 import app.gestaoIAWpp.produto.ProdutoRepositoryEmMemoria;
 import app.gestaoIAWpp.produto.ProdutoService;
+import com.anthropic.models.messages.OutputConfig;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -361,8 +362,50 @@ class AgenteSpringAiTest {
         AnthropicChatOptions opcoes = (AnthropicChatOptions) primeiro.getOptions();
         assertThat(opcoes.getModel()).isEqualTo("claude-haiku-5-5");
         assertThat(opcoes.getMaxTokens()).isEqualTo(16000);
+        assertThat(opcoes.getOutputConfig().effort()).hasValue(OutputConfig.Effort.LOW);
         assertThat(((ToolCallingChatOptions) opcoes).getToolCallbacks()).hasSize(5);
         assertThat(primeiro.getInstructions()).filteredOn(m -> m instanceof SystemMessage)
                 .singleElement().extracting(Message::getText).asString().isNotBlank();
+    }
+
+    @Test
+    void maxTokensRetornaFallbackSemSujarMemoria() {
+        when(chatModel.call(any(Prompt.class))).thenReturn(
+                texto("olá"), resposta(new AssistantMessage("resposta cortada"), "max_tokens"), texto("tudo certo"));
+
+        agente.responder(TEL, "oi");
+        RespostaAgente r = agente.responder(TEL, "conta uma história");
+        agente.responder(TEL, "e agora?");
+
+        assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
+        assertThat(r.iteracoes()).last().extracting(IteracaoTurno::observacao).asString().contains("max_tokens");
+        assertThat(resumo(prompts(3).get(2))).containsExactly("user:oi", "assistant:olá", "user:e agora?");
+    }
+
+    @Test
+    void limiteDeToolsSomandoRodadasRetornaFallback() {
+        when(chatModel.call(any(Prompt.class))).thenReturn(
+                comTools(verCarrinho(0, 4)), comTools(verCarrinho(4, 4)), comTools(verCarrinho(8, 3)));
+
+        RespostaAgente r = agente.responder(TEL, "meu carrinho");
+
+        assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
+        assertThat(r.iteracoes()).last().extracting(IteracaoTurno::observacao).asString()
+                .contains("limite de tools");
+        verify(chatModel, times(3)).call(any(Prompt.class));
+
+        when(chatModel.call(any(Prompt.class))).thenReturn(texto("ok"));
+        agente.responder(TEL, "e agora?");
+        Prompt seguinte = ultimoPrompt();
+        semToolUse(seguinte);
+        assertThat(resumo(seguinte)).containsExactly("user:e agora?");
+    }
+
+    private static List<AssistantMessage.ToolCall> verCarrinho(int inicio, int quantas) {
+        List<AssistantMessage.ToolCall> calls = new ArrayList<>();
+        for (int i = inicio; i < inicio + quantas; i++) {
+            calls.add(new AssistantMessage.ToolCall("t" + i, "function", "ver_carrinho", "{}"));
+        }
+        return calls;
     }
 }

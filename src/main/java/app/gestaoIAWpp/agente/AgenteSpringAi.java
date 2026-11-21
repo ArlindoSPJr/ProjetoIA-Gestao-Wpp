@@ -43,6 +43,9 @@ public class AgenteSpringAi implements AgenteAtendimento {
     static final String MENSAGEM_FALLBACK =
             "Desculpe, não consegui concluir agora. Vou chamar um atendente para te ajudar.";
 
+    /** Valor de {@code StopReason.toString()} do SDK da Anthropic para um fim de turno normal. */
+    private static final String FINISH_NORMAL = "end_turn";
+
     private static final Logger log = LoggerFactory.getLogger(AgenteSpringAi.class);
     private static final int MAX_TOKENS = 16000;
     private static final String CAMINHO_PROMPT = "prompts/sistema-atendimento.txt";
@@ -125,6 +128,12 @@ public class AgenteSpringAi implements AgenteAtendimento {
                 ? null : resposta.getResult().getOutput().getText();
         if (texto == null || texto.isBlank()) {
             registro.observar("O modelo terminou sem texto.");
+            return fallback(telefone, snapshot, geracaoDoTurno, registro);
+        }
+        // Só "end_turn" é fim normal. finish nulo ou vazio (a Anthropic não informou o motivo) não é
+        // tratado como falha: o texto não vazio, checado acima, é a garantia.
+        if (finish != null && !finish.isBlank() && !FINISH_NORMAL.equalsIgnoreCase(finish)) {
+            registro.observar("O modelo parou com finish " + finish + ".");
             return fallback(telefone, snapshot, geracaoDoTurno, registro);
         }
 
