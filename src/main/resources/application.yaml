@@ -15,3 +15,9 @@ agente:
   modelo: claude-haiku-5-5
   effort: low
   max-iteracoes: 5
+
+logging:
+  level:
+    # INFO: uma linha por iteração do loop e por tool executada.
+    # DEBUG: também o JSON completo de cada requisição e resposta da API do Claude.
+    app.gestaoIAWpp.agente.AgenteClaude: INFO

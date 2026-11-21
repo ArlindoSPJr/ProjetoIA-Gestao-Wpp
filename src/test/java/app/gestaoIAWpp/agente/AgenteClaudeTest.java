@@ -205,6 +205,99 @@ class AgenteClaudeTest {
         assertThat(capturarRequisicoes(2).get(1).messages()).hasSize(1);
     }
 
+    @Test
+    void iteracoesRegistramEnvioRetornoETools() {
+        when(client.messages().create(any(MessageCreateParams.class)))
+                .thenReturn(respostaToolUse("toolu_1", "consultar_produto", Map.of("termo", "camisa preta")),
+                        respostaTexto("Temos sim!"));
+
+        var r = agente.responder(TEL, "tem camisa preta?");
+
+        assertThat(r.iteracoes()).hasSize(2);
+        IteracaoAgente primeira = r.iteracoes().get(0);
+        assertThat(primeira.numero()).isEqualTo(1);
+        assertThat(primeira.envio().modelo()).isEqualTo("claude-haiku-5-5");
+        assertThat(primeira.envio().effort()).isEqualTo("low");
+        assertThat(primeira.envio().maxTokens()).isEqualTo(16000L);
+        assertThat(primeira.envio().totalMensagens()).isEqualTo(1);
+        assertThat(primeira.envio().totalTools()).isEqualTo(5);
+        assertThat(primeira.envio().novasMensagensJson()).contains("tem camisa preta?");
+        assertThat(primeira.envio().requisicaoJson()).contains("claude-haiku-5-5", "consultar_produto", "tem camisa preta?");
+        assertThat(primeira.retorno().stopReason()).isEqualTo("tool_use");
+        assertThat(primeira.retorno().tokensEntrada()).isEqualTo(10);
+        assertThat(primeira.retorno().tokensSaida()).isEqualTo(5);
+        // A página lê "type", "name", "input" e "text" desse JSON para mostrar os blocos.
+        assertThat(primeira.retorno().conteudoJson())
+                .contains("\"type\" : \"tool_use\"", "\"name\" : \"consultar_produto\"", "toolu_1", "camisa preta");
+        assertThat(primeira.ferramentas()).singleElement()
+                .satisfies(c -> assertThat(c.nome()).isEqualTo("consultar_produto"));
+        assertThat(primeira.observacao()).isNull();
+
+        IteracaoAgente segunda = r.iteracoes().get(1);
+        assertThat(segunda.numero()).isEqualTo(2);
+        assertThat(segunda.envio().totalMensagens()).isEqualTo(3);
+        assertThat(segunda.envio().novasMensagensJson()).contains("toolu_1", "P001").doesNotContain("tem camisa preta?");
+        assertThat(segunda.retorno().stopReason()).isEqualTo("end_turn");
+        assertThat(segunda.retorno().conteudoJson()).contains("\"type\" : \"text\"", "Temos sim!");
+        assertThat(segunda.ferramentas()).isEmpty();
+        assertThat(r.chamadas()).hasSize(1);
+    }
+
+    @Test
+    void primeiraIteracaoDoSegundoTurnoMostraSoAMensagemNova() {
+        when(client.messages().create(any(MessageCreateParams.class)))
+                .thenReturn(respostaTexto("olá"), respostaTexto("tudo bem"));
+
+        agente.responder(TEL, "oi");
+        var r = agente.responder(TEL, "como vai?");
+
+        IteracaoAgente it = r.iteracoes().get(0);
+        assertThat(it.envio().totalMensagens()).isEqualTo(3);
+        assertThat(it.envio().novasMensagensJson()).contains("como vai?").doesNotContain("\"oi\"");
+    }
+
+    @Test
+    void falhaNaApiRegistraIteracaoSemRetorno() {
+        when(client.messages().create(any(MessageCreateParams.class)))
+                .thenThrow(new RuntimeException("falha simulada"));
+
+        var r = agente.responder(TEL, "oi");
+
+        assertThat(r.texto()).isEqualTo(AgenteClaude.MENSAGEM_FALLBACK);
+        assertThat(r.iteracoes()).singleElement().satisfies(it -> {
+            assertThat(it.envio().totalMensagens()).isEqualTo(1);
+            assertThat(it.retorno()).isNull();
+            assertThat(it.observacao()).contains("falha simulada");
+        });
+    }
+
+    @Test
+    void limiteDeIteracoesFicaRegistradoNaUltima() {
+        when(client.messages().create(any(MessageCreateParams.class)))
+                .thenReturn(respostaToolUse("t", "ver_carrinho", Map.of()));
+
+        var r = agente.responder(TEL, "oi");
+
+        assertThat(r.iteracoes()).hasSize(5);
+        assertThat(r.iteracoes().subList(0, 4)).allSatisfy(it -> assertThat(it.ferramentas()).hasSize(1));
+        IteracaoAgente ultima = r.iteracoes().get(4);
+        assertThat(ultima.ferramentas()).isEmpty();
+        assertThat(ultima.observacao()).contains("limite");
+    }
+
+    @Test
+    void stopReasonInesperadoFicaRegistrado() {
+        when(client.messages().create(any(MessageCreateParams.class)))
+                .thenReturn(resposta(StopReason.REFUSAL, ContentBlock.ofText(texto("não posso"))));
+
+        var r = agente.responder(TEL, "oi");
+
+        assertThat(r.iteracoes()).singleElement().satisfies(it -> {
+            assertThat(it.retorno().stopReason()).isEqualTo("refusal");
+            assertThat(it.observacao()).contains("refusal");
+        });
+    }
+
     private List<MessageCreateParams> capturarRequisicoes(int quantidade) {
         var captor = ArgumentCaptor.forClass(MessageCreateParams.class);
         verify(client.messages(), times(quantidade)).create(captor.capture());

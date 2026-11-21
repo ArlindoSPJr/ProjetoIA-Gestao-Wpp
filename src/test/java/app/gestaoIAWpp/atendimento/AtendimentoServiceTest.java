@@ -18,7 +18,7 @@ class AtendimentoServiceTest {
 
     @Test
     void delegaAoAgenteComTextoSemEspacos() {
-        when(agente.responder("5511", "oi")).thenReturn(new RespostaAgente("olá", List.of()));
+        when(agente.responder("5511", "oi")).thenReturn(new RespostaAgente("olá", List.of(), List.of()));
         assertThat(service.processarMensagem("5511", "  oi ").texto()).isEqualTo("olá");
     }
 

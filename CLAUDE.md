@@ -30,6 +30,8 @@ Demo do simulador (precisa de `ANTHROPIC_API_KEY`): copie `.env.example` para `.
 
 Se o bot só responder "vou chamar um atendente", confira a ANTHROPIC_API_KEY e os logs (log.warn do AgenteClaude mostra o erro).
 
+O `AgenteClaude` registra cada iteração do loop: em INFO, uma linha por chamada à API (stop_reason, tokens, tools pedidas) e por tool executada; em DEBUG (`logging.level` no `application.yaml`), o JSON completo da requisição e da resposta. A mesma informação volta em `RespostaAgente.iteracoes` e aparece na seção "Iterações do último turno" da página. O JSON de objetos do SDK é gerado com `com.anthropic.core.ObjectMappers.jsonMapper()` (Jackson 2), nunca com o `JsonMapper` do Boot.
+
 Modelo, effort e limite de iterações do agente ficam no bloco `agente:` do `application.yaml`.
 
 Plano da demo: `docs/superpowers/plans/2026-11-20-demo-agente-atendimento.md` (spec em `docs/superpowers/specs/`).

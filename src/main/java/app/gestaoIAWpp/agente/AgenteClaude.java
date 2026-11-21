@@ -1,6 +1,7 @@
 package app.gestaoIAWpp.agente;
 
 import com.anthropic.client.AnthropicClient;
+import com.anthropic.core.ObjectMappers;
 import com.anthropic.models.messages.ContentBlock;
 import com.anthropic.models.messages.ContentBlockParam;
 import com.anthropic.models.messages.Message;
@@ -92,12 +93,35 @@ public class AgenteClaude implements AgenteAtendimento {
         long geracaoDoTurno = geracao.get();
         // Trabalha numa cópia: o histórico só é substituído se o turno terminar bem.
         List<MessageParam> turno = new ArrayList<>(historico.getOrDefault(telefone, List.of()));
+        int inicioNovas = turno.size();
         turno.add(MessageParam.ofUser(mensagem));
         List<ChamadaFerramenta> chamadas = new ArrayList<>();
+        List<IteracaoAgente> iteracoes = new ArrayList<>();
+        int max = props.maxIteracoes();
 
         try {
-            for (int iteracao = 1; iteracao <= props.maxIteracoes(); iteracao++) {
-                Message resposta = client.messages().create(montarRequisicao(turno));
+            for (int iteracao = 1; iteracao <= max; iteracao++) {
+                MessageCreateParams params = montarRequisicao(turno);
+                List<MessageParam> novas = turno.subList(inicioNovas, turno.size());
+                EnvioApi envio = resumirEnvio(params, novas);
+                log.info("[{}] iteração {}/{}: enviando {} mensagens ({} novas) ao {}",
+                        telefone, iteracao, max, envio.totalMensagens(), novas.size(), envio.modelo());
+                log.debug("[{}] iteração {} - requisição:\n{}", telefone, iteracao, envio.requisicaoJson());
+
+                Message resposta;
+                try {
+                    resposta = client.messages().create(params);
+                } catch (RuntimeException e) {
+                    log.warn("Falha no turno de {} (iteração {}).", telefone, iteracao, e);
+                    iteracoes.add(new IteracaoAgente(iteracao, envio, null, List.of(),
+                            "Falha na chamada à API: " + e.getMessage()));
+                    return fallback(chamadas, iteracoes);
+                }
+                RetornoApi retorno = resumirRetorno(resposta);
+                log.info("[{}] iteração {}/{}: stop_reason={}, tokens entrada={} saída={}, tools pedidas={}",
+                        telefone, iteracao, max, retorno.stopReason(), retorno.tokensEntrada(),
+                        retorno.tokensSaida(), nomesDasTools(resposta));
+                log.debug("[{}] iteração {} - resposta:\n{}", telefone, iteracao, retorno.conteudoJson());
                 // A resposta volta inteira (inclusive blocos thinking), nunca só o texto.
                 turno.add(resposta.toParam());
 
@@ -106,31 +130,42 @@ public class AgenteClaude implements AgenteAtendimento {
                     String texto = juntarTexto(resposta);
                     if (texto.isBlank()) {
                         log.warn("Turno de {} terminou em end_turn sem texto.", telefone);
-                        return fallback(chamadas);
+                        iteracoes.add(new IteracaoAgente(iteracao, envio, retorno, List.of(),
+                                "O modelo terminou (end_turn) sem texto."));
+                        return fallback(chamadas, iteracoes);
                     }
+                    iteracoes.add(new IteracaoAgente(iteracao, envio, retorno, List.of(), null));
                     // Se houve reset durante o turno, a resposta vai ao cliente mas o histórico antigo não volta.
                     if (geracao.get() == geracaoDoTurno) {
                         historico.put(telefone, turno);
                     }
-                    return new RespostaAgente(texto, chamadas);
+                    return new RespostaAgente(texto, chamadas, iteracoes);
                 }
                 if (!StopReason.TOOL_USE.equals(stopReason)) {
                     log.warn("Turno de {} parou com stopReason {}.", telefone, stopReason);
-                    return fallback(chamadas);
+                    iteracoes.add(new IteracaoAgente(iteracao, envio, retorno, List.of(),
+                            "Parou com stop_reason " + retorno.stopReason() + "."));
+                    return fallback(chamadas, iteracoes);
                 }
-                if (iteracao == props.maxIteracoes()) {
-                    log.warn("Turno de {} atingiu o limite de {} chamadas à API ainda pedindo tools.",
-                            telefone, props.maxIteracoes());
-                    return fallback(chamadas);
+                if (iteracao == max) {
+                    log.warn("Turno de {} atingiu o limite de {} chamadas à API ainda pedindo tools.", telefone, max);
+                    iteracoes.add(new IteracaoAgente(iteracao, envio, retorno, List.of(),
+                            "Atingiu o limite de " + max + " chamadas à API; as tools pedidas não foram executadas."));
+                    return fallback(chamadas, iteracoes);
                 }
-                turno.add(executarTools(telefone, resposta, chamadas));
+                List<ChamadaFerramenta> daIteracao = new ArrayList<>();
+                // A próxima requisição reenvia esta resposta (já mostrada aqui); as "novas" serão só os tool_result.
+                inicioNovas = turno.size();
+                turno.add(executarTools(telefone, resposta, daIteracao));
+                chamadas.addAll(daIteracao);
+                iteracoes.add(new IteracaoAgente(iteracao, envio, retorno, daIteracao, null));
             }
             // Só alcançável com maxIteracoes < 1.
-            log.warn("Turno de {} não executou nenhuma iteração (maxIteracoes = {}).", telefone, props.maxIteracoes());
-            return fallback(chamadas);
+            log.warn("Turno de {} não executou nenhuma iteração (maxIteracoes = {}).", telefone, max);
+            return fallback(chamadas, iteracoes);
         } catch (RuntimeException e) {
             log.warn("Falha no turno de {}.", telefone, e);
-            return fallback(chamadas);
+            return fallback(chamadas, iteracoes);
         }
     }
 
@@ -156,8 +191,11 @@ public class AgenteClaude implements AgenteAtendimento {
             // A entrada é um JsonValue do SDK (Jackson 2): convertida pelo próprio SDK, não pelo JsonMapper.
             Map<String, Object> entrada = toolUse._input().convert(new TypeReference<Map<String, Object>>() {});
             ResultadoFerramenta resultado = ferramentas.executar(telefone, toolUse.name(), entrada);
-            chamadas.add(new ChamadaFerramenta(toolUse.name(), mapper.writeValueAsString(entrada),
-                    resultado.conteudoJson(), resultado.erro()));
+            String entradaJson = mapper.writeValueAsString(entrada);
+            log.info("[{}] tool {} entrada={} -> {}", telefone, toolUse.name(), entradaJson,
+                    resultado.erro() ? "erro" : "ok");
+            log.debug("[{}] tool {} resultado: {}", telefone, toolUse.name(), resultado.conteudoJson());
+            chamadas.add(new ChamadaFerramenta(toolUse.name(), entradaJson, resultado.conteudoJson(), resultado.erro()));
             resultados.add(ContentBlockParam.ofToolResult(ToolResultBlockParam.builder()
                     .toolUseId(toolUse.id())
                     .content(resultado.conteudoJson())
@@ -174,8 +212,36 @@ public class AgenteClaude implements AgenteAtendimento {
                 .collect(Collectors.joining());
     }
 
-    private static RespostaAgente fallback(List<ChamadaFerramenta> chamadas) {
-        return new RespostaAgente(MENSAGEM_FALLBACK, chamadas);
+    private EnvioApi resumirEnvio(MessageCreateParams params, List<MessageParam> novas) {
+        return new EnvioApi(props.modelo(), props.effort(), params.maxTokens(), params.messages().size(),
+                params.tools().map(List::size).orElse(0), jsonDoSdk(novas), jsonDoSdk(params._body()));
+    }
+
+    private static RetornoApi resumirRetorno(Message resposta) {
+        String stopReason = resposta.stopReason().map(StopReason::asString).orElse(null);
+        return new RetornoApi(stopReason, resposta.usage().inputTokens(), resposta.usage().outputTokens(),
+                jsonDoSdk(resposta.content()));
+    }
+
+    private static List<String> nomesDasTools(Message resposta) {
+        return resposta.content().stream().filter(ContentBlock::isToolUse).map(b -> b.asToolUse().name()).toList();
+    }
+
+    /**
+     * Serializa objetos do SDK com o mapper do próprio SDK (Jackson 2), que conhece os tipos dele.
+     * É só para exibição: se falhar, o turno segue normalmente.
+     */
+    private static String jsonDoSdk(Object valor) {
+        try {
+            return ObjectMappers.jsonMapper().writerWithDefaultPrettyPrinter().writeValueAsString(valor);
+        } catch (Exception e) {
+            log.debug("Não foi possível serializar {} para exibição.", valor.getClass().getSimpleName(), e);
+            return "\"(não foi possível serializar: " + e.getClass().getSimpleName() + ")\"";
+        }
+    }
+
+    private static RespostaAgente fallback(List<ChamadaFerramenta> chamadas, List<IteracaoAgente> iteracoes) {
+        return new RespostaAgente(MENSAGEM_FALLBACK, chamadas, iteracoes);
     }
 
     private static String lerPrompt() {
