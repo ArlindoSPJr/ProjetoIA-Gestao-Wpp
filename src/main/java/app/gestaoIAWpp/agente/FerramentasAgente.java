@@ -1,16 +1,9 @@
 package app.gestaoIAWpp.agente;
 
 import app.gestaoIAWpp.carrinho.CarrinhoService;
-import app.gestaoIAWpp.produto.EstoqueService;
-import app.gestaoIAWpp.produto.Produto;
-import app.gestaoIAWpp.produto.ProdutoEncontrado;
-import app.gestaoIAWpp.produto.ProdutoNaoEncontradoException;
-import app.gestaoIAWpp.produto.ProdutoRepository;
+import app.gestaoIAWpp.produto.ProdutoService;
 import com.anthropic.core.JsonValue;
 import com.anthropic.models.messages.Tool;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -23,23 +16,18 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class FerramentasAgente {
 
-    static final int LIMITE_RESULTADOS_BUSCA = 5;
-
     private static final String DESCRICAO_PRODUTO_ID = "Id do produto retornado por consultar_produto.";
     private static final String MENSAGEM_ERRO_PADRAO = "Erro inesperado ao executar a ferramenta.";
     private static final String JSON_ERRO_FIXO = "{\"erro\":\"" + MENSAGEM_ERRO_PADRAO + "\"}";
     private static final String ERRO_QUANTIDADE =
             "Parâmetro inválido: quantidade deve ser um número inteiro maior que zero.";
 
-    private final ProdutoRepository produtos;
-    private final EstoqueService estoque;
+    private final ProdutoService produtoService;
     private final CarrinhoService carrinho;
     private final JsonMapper mapper;
 
-    public FerramentasAgente(ProdutoRepository produtos, EstoqueService estoque,
-                             CarrinhoService carrinho, JsonMapper mapper) {
-        this.produtos = produtos;
-        this.estoque = estoque;
+    public FerramentasAgente(ProdutoService produtoService, CarrinhoService carrinho, JsonMapper mapper) {
+        this.produtoService = produtoService;
         this.carrinho = carrinho;
         this.mapper = mapper;
     }
@@ -90,8 +78,8 @@ public class FerramentasAgente {
     public ResultadoFerramenta executar(String telefone, String nome, Map<String, Object> entrada) {
         try {
             Object resultado = switch (nome) {
-                case "consultar_produto" -> consultarProduto(texto(entrada, "termo"));
-                case "consultar_estoque" -> consultarEstoque(texto(entrada, "produto_id"));
+                case "consultar_produto" -> produtoService.buscar(texto(entrada, "termo"));
+                case "consultar_estoque" -> produtoService.consultarDisponibilidade(texto(entrada, "produto_id"));
                 case "adicionar_ao_carrinho" -> {
                     String id = texto(entrada, "produto_id");
                     yield carrinho.adicionar(telefone, id, quantidade(entrada, true));
@@ -107,55 +95,6 @@ public class FerramentasAgente {
         } catch (Exception e) {
             return erro(e.getMessage());
         }
-    }
-
-    private Map<String, Object> consultarProduto(String termo) {
-        List<ProdutoEncontrado> encontrados = new ArrayList<>(produtos.buscar(termo));
-        encontrados.sort(Comparator
-                .comparingInt(ProdutoEncontrado::pontuacao).reversed()
-                .thenComparing(pe -> estoque.consultar(pe.produto().id()) > 0 ? 0 : 1)
-                .thenComparing(pe -> pe.produto().id()));
-
-        List<Map<String, Object>> lista = encontrados.stream()
-                .limit(LIMITE_RESULTADOS_BUSCA)
-                .map(pe -> resumoProduto(pe.produto()))
-                .toList();
-
-        var resposta = new LinkedHashMap<String, Object>();
-        resposta.put("produtos", lista);
-        resposta.put("totalEncontrado", encontrados.size());
-        if (encontrados.isEmpty()) {
-            resposta.put("mensagem", "Nenhum produto encontrado para '" + termo + "'.");
-        } else if (encontrados.size() > LIMITE_RESULTADOS_BUSCA) {
-            resposta.put("mensagem", "Foram encontrados " + encontrados.size() + " produtos para '" + termo
-                    + "'; estes são os " + LIMITE_RESULTADOS_BUSCA + " mais relevantes. Peça ao cliente mais "
-                    + "detalhes (modelo, cor ou tamanho) para refinar a busca.");
-        }
-        return resposta;
-    }
-
-    private Map<String, Object> resumoProduto(Produto p) {
-        int disponivel = estoque.consultar(p.id());
-        var m = new LinkedHashMap<String, Object>();
-        m.put("id", p.id());
-        m.put("nome", p.nome());
-        m.put("descricao", p.descricao());
-        m.put("preco", p.preco());
-        m.put("emEstoque", disponivel > 0);
-        m.put("quantidadeDisponivel", disponivel);
-        return m;
-    }
-
-    private Map<String, Object> consultarEstoque(String produtoId) {
-        Produto p = produtos.buscarPorId(produtoId)
-                .orElseThrow(() -> new ProdutoNaoEncontradoException(produtoId));
-        int disponivel = estoque.consultar(produtoId);
-        var m = new LinkedHashMap<String, Object>();
-        m.put("produtoId", p.id());
-        m.put("nome", p.nome());
-        m.put("emEstoque", disponivel > 0);
-        m.put("quantidadeDisponivel", disponivel);
-        return m;
     }
 
     private String texto(Map<String, Object> entrada, String chave) {
