@@ -10,14 +10,20 @@ spring:
       - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
       - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
       - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+    tools:
+      limits:
+        # Rede de segurança. O limite principal é agente.max-iteracoes (chamadas à API por turno).
+        max-total-tool-calls: 10
 
 agente:
   modelo: claude-haiku-5-5
   effort: low
-  max-iteracoes: 5
+  max-iteracoes: 5 # chamadas à API por turno
 
 logging:
   level:
-    # INFO: uma linha por iteração do loop e por tool executada.
-    # DEBUG: também o JSON completo de cada requisição e resposta da API do Claude.
-    app.gestaoIAWpp.agente.AgenteClaude: INFO
+    # Troque para DEBUG para ver no terminal a requisição e a resposta de cada rodada do loop.
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: INFO
