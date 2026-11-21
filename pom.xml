@@ -67,12 +67,6 @@
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-anthropic</artifactId>
 		</dependency>
-		<!-- Versão alinhada ao anthropic-java-core 3.8.0 do Spring AI. Sai quando o loop manual for removido (T7). -->
-		<dependency>
-			<groupId>com.anthropic</groupId>
-			<artifactId>anthropic-java</artifactId>
-			<version>3.8.0</version>
-		</dependency>
 
 		<dependency>
 			<groupId>org.postgresql</groupId>

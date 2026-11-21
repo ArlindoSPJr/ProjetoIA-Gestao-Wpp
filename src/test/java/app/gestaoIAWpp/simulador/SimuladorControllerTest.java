@@ -9,11 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import app.gestaoIAWpp.agente.AgenteAtendimento;
-import app.gestaoIAWpp.agente.ChamadaFerramenta;
-import app.gestaoIAWpp.agente.EnvioApi;
-import app.gestaoIAWpp.agente.IteracaoAgente;
-import app.gestaoIAWpp.agente.RetornoApi;
+import app.gestaoIAWpp.agente.IteracaoTurno;
 import app.gestaoIAWpp.agente.RespostaAgente;
+import app.gestaoIAWpp.agente.ToolPedida;
 import app.gestaoIAWpp.atendimento.AtendimentoService;
 import app.gestaoIAWpp.carrinho.CarrinhoResumo;
 import app.gestaoIAWpp.carrinho.CarrinhoService;
@@ -41,22 +39,18 @@ class SimuladorControllerTest {
     @MockitoBean EstoqueService estoque;
 
     @Test
-    void postMensagemRetornaTextoEChamadas() throws Exception {
-        var chamada = new ChamadaFerramenta("consultar_produto", "{}", "{}", false);
-        var iteracao = new IteracaoAgente(1,
-                new EnvioApi("claude-haiku-5-5", "low", 16000L, 1, 5, "[]", "{}"),
-                new RetornoApi("tool_use", 10, 5, "[]"), List.of(chamada), null);
+    void postMensagemRetornaTextoEIteracoes() throws Exception {
+        var iteracao = new IteracaoTurno(1, "tool_use", 10, 5,
+                List.of(new ToolPedida("consultar_produto", "{}")), null);
         when(atendimento.processarMensagem("5511", "oi"))
-                .thenReturn(new RespostaAgente("olá", List.of(chamada), List.of(iteracao)));
+                .thenReturn(new RespostaAgente("olá", List.of(iteracao)));
         mvc.perform(post("/api/simulador/mensagens").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"telefone\":\"5511\",\"texto\":\"oi\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.texto").value("olá"))
-                .andExpect(jsonPath("$.chamadas[0].nome").value("consultar_produto"))
-                .andExpect(jsonPath("$.iteracoes[0].numero").value(1))
-                .andExpect(jsonPath("$.iteracoes[0].envio.totalMensagens").value(1))
-                .andExpect(jsonPath("$.iteracoes[0].retorno.stopReason").value("tool_use"))
-                .andExpect(jsonPath("$.iteracoes[0].ferramentas[0].nome").value("consultar_produto"));
+                .andExpect(jsonPath("$.iteracoes[0].finishReason").value("tool_use"))
+                .andExpect(jsonPath("$.iteracoes[0].toolsPedidas[0].nome").value("consultar_produto"))
+                .andExpect(jsonPath("$.chamadas").doesNotExist());
     }
 
     @Test
