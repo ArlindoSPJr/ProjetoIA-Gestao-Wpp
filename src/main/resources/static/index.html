@@ -33,10 +33,6 @@
   tr.zerado td { background: #fde2e2; font-weight: bold; }
   .total { text-align: right; font-weight: bold; margin-top: 6px; }
   .vazio { color: #888; font-size: 14px; }
-  .chamada { border: 1px solid #ddd; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 13px; }
-  .chamada .nome { font-weight: bold; }
-  .chamada pre { margin: 2px 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; }
-  .chamada.erro pre.resultado, .chamada.erro .nome { color: #b3261e; }
   .resumo-turno { font-size: 13px; color: #555; margin-bottom: 8px; }
   .iteracao { border: 1px solid #cfd8dc; border-left: 4px solid #128c7e; border-radius: 6px; padding: 8px; margin-bottom: 10px; font-size: 13px; }
   .iteracao.alerta { border-left-color: #b3261e; }
@@ -47,8 +43,7 @@
   .etapa { margin: 6px 0 0; padding-left: 8px; border-left: 2px solid #eee; }
   .etapa h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #607d8b; margin: 0 0 4px; }
   .etapa .linha { margin: 2px 0; }
-  .etapa pre, details pre { margin: 2px 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; background: #f7f7f7; padding: 4px 6px; border-radius: 4px; max-height: 260px; overflow: auto; }
-  details summary { cursor: pointer; color: #075e54; margin: 2px 0; }
+  .etapa pre { margin: 2px 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; background: #f7f7f7; padding: 4px 6px; border-radius: 4px; max-height: 260px; overflow: auto; }
   .observacao { background: #fde2e2; color: #b3261e; border-radius: 4px; padding: 4px 6px; margin-top: 6px; }
   @media (max-width: 767px) {
     main { grid-template-columns: 1fr; height: auto; }
@@ -143,71 +138,22 @@ function mostrarEstado(estado) {
   ], estado.estoque || [], p => p.quantidade === 0 ? 'zerado' : ''));
 }
 
-function lerJson(texto) {
-  try { return JSON.parse(texto); } catch (e) { return null; }
-}
-
-function detalhes(titulo, conteudo, aberto) {
-  const d = el('details');
-  if (aberto) d.open = true;
-  d.appendChild(el('summary', titulo));
-  d.appendChild(el('pre', conteudo));
-  return d;
-}
-
-function caixaChamada(c) {
-  const box = el('div', null, 'chamada' + (c.erro ? ' erro' : ''));
-  box.appendChild(el('div', c.nome + (c.erro ? ' (erro)' : ''), 'nome'));
-  box.appendChild(el('pre', 'Entrada: ' + c.entradaJson));
-  box.appendChild(el('pre', 'Resultado: ' + c.resultadoJson, 'resultado'));
-  return box;
-}
-
-// Mostra os blocos de conteúdo que o modelo devolveu de forma legível (o JSON bruto fica no "ver JSON").
-function blocosLegiveis(conteudoJson) {
-  const blocos = lerJson(conteudoJson);
-  const div = el('div');
-  if (!Array.isArray(blocos)) return div;
-  blocos.forEach(b => {
-    if (b.type === 'text') div.appendChild(el('div', 'Texto: ' + b.text, 'linha'));
-    else if (b.type === 'tool_use') div.appendChild(el('div', 'Pede a tool ' + b.name + ' ' + JSON.stringify(b.input) + ' (id ' + b.id + ')', 'linha'));
-    else if (b.type === 'thinking') div.appendChild(el('div', 'Raciocínio (thinking)', 'linha'));
-    else div.appendChild(el('div', 'Bloco ' + b.type, 'linha'));
-  });
-  return div;
-}
-
 function caixaIteracao(it) {
   const box = el('div', null, 'iteracao' + (it.observacao ? ' alerta' : ''));
   const titulo = el('div', 'Iteração ' + it.numero, 'titulo');
-  if (it.retorno) {
-    titulo.appendChild(el('span', 'stop_reason: ' + it.retorno.stopReason, 'etiqueta ' + it.retorno.stopReason));
-    titulo.appendChild(el('span', 'tokens: ' + it.retorno.tokensEntrada + ' entrada / ' + it.retorno.tokensSaida + ' saída', 'etiqueta'));
-  }
+  titulo.appendChild(el('span', 'finish: ' + it.finishReason, 'etiqueta ' + it.finishReason));
+  titulo.appendChild(el('span', 'tokens: ' + it.tokensEntrada + ' entrada / ' + it.tokensSaida + ' saída', 'etiqueta'));
   box.appendChild(titulo);
 
-  const envio = el('div', null, 'etapa');
-  envio.appendChild(el('h3', 'Enviado à API'));
-  const e = it.envio;
-  envio.appendChild(el('div', e.modelo + ' · effort ' + e.effort + ' · max_tokens ' + e.maxTokens + ' · '
-    + e.totalMensagens + ' mensagens no histórico · ' + e.totalTools + ' tools', 'linha'));
-  const rotuloNovas = it.numero === 1 ? 'Mensagem nova do cliente' : 'Mensagens novas (tool_result); a resposta anterior do modelo também é reenviada';
-  envio.appendChild(detalhes(rotuloNovas, e.novasMensagensJson, true));
-  envio.appendChild(detalhes('Ver JSON completo da requisição', e.requisicaoJson, false));
-  box.appendChild(envio);
-
-  if (it.retorno) {
-    const retorno = el('div', null, 'etapa');
-    retorno.appendChild(el('h3', 'Devolvido pela API'));
-    retorno.appendChild(blocosLegiveis(it.retorno.conteudoJson));
-    retorno.appendChild(detalhes('Ver JSON da resposta', it.retorno.conteudoJson, false));
-    box.appendChild(retorno);
-  }
-
-  if (it.ferramentas && it.ferramentas.length > 0) {
+  if (it.toolsPedidas && it.toolsPedidas.length > 0) {
     const tools = el('div', null, 'etapa');
-    tools.appendChild(el('h3', 'Tools executadas pelo Java'));
-    it.ferramentas.forEach(c => tools.appendChild(caixaChamada(c)));
+    tools.appendChild(el('h3', 'Tools pedidas pelo modelo'));
+    it.toolsPedidas.forEach(t => {
+      const linha = el('div', null, 'linha');
+      linha.appendChild(el('strong', t.nome));
+      linha.appendChild(el('pre', t.entradaJson));
+      tools.appendChild(linha);
+    });
     box.appendChild(tools);
   }
 
@@ -222,10 +168,12 @@ function mostrarIteracoes(iteracoes) {
     div.appendChild(el('span', 'Nenhuma iteração neste turno.', 'vazio'));
     return;
   }
-  const entrada = iteracoes.reduce((s, it) => s + (it.retorno ? it.retorno.tokensEntrada : 0), 0);
-  const saida = iteracoes.reduce((s, it) => s + (it.retorno ? it.retorno.tokensSaida : 0), 0);
-  div.appendChild(el('div', iteracoes.length + ' chamada(s) à API · ' + entrada + ' tokens de entrada / '
-    + saida + ' de saída no turno', 'resumo-turno'));
+  const entrada = iteracoes.reduce((s, it) => s + (it.tokensEntrada || 0), 0);
+  const saida = iteracoes.reduce((s, it) => s + (it.tokensSaida || 0), 0);
+  const resumo = el('div', iteracoes.length + ' chamada(s) à API · ' + entrada + ' tokens de entrada / '
+    + saida + ' de saída no turno', 'resumo-turno');
+  resumo.appendChild(el('div', 'Resultado das tools e JSON de cada rodada: ligue o SimpleLoggerAdvisor em DEBUG no application.yaml.'));
+  div.appendChild(resumo);
   iteracoes.forEach(it => div.appendChild(caixaIteracao(it)));
 }
 
