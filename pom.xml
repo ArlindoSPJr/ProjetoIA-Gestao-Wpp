@@ -28,7 +28,19 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<spring-ai.version>2.1.0</spring-ai.version>
 	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.ai</groupId>
+				<artifactId>spring-ai-bom</artifactId>
+				<version>${spring-ai.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -50,11 +62,16 @@
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
-		<!-- Spring AI removido nesta fase: o function calling é manual com o SDK oficial. Volta na etapa de RAG. -->
+		<!-- Spring AI 2.1 (starter Anthropic): ChatClient e tool calling. pgvector e o advisor de RAG continuam fora (etapa de RAG). -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-anthropic</artifactId>
+		</dependency>
+		<!-- Versão alinhada ao anthropic-java-core 3.8.0 do Spring AI. Sai quando o loop manual for removido (T7). -->
 		<dependency>
 			<groupId>com.anthropic</groupId>
 			<artifactId>anthropic-java</artifactId>
-			<version>3.3.0</version>
+			<version>3.8.0</version>
 		</dependency>
 
 		<dependency>
