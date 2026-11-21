@@ -54,6 +54,15 @@ class RegistroTurnoTest {
     }
 
     @Test
+    void observarSemIteracaoNaoLancaENaoRegistra() {
+        RegistroTurno registro = new RegistroTurno();
+
+        registro.observar("falha");
+
+        assertThat(registro.iteracoes()).isEmpty();
+    }
+
+    @Test
     void deDevolveRegistroOuNull() {
         RegistroTurno registro = new RegistroTurno();
 

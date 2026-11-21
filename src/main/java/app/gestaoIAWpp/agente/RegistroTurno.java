@@ -26,6 +26,9 @@ public final class RegistroTurno {
     }
 
     public void observar(String texto) {
+        if (iteracoes.isEmpty()) {
+            return;
+        }
         IteracaoTurno atual = ultima();
         iteracoes.set(iteracoes.size() - 1, new IteracaoTurno(
                 atual.numero(), atual.finishReason(), atual.tokensEntrada(), atual.tokensSaida(),
