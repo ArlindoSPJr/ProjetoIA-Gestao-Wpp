@@ -2,5 +2,9 @@ package app.gestaoIAWpp.agente;
 
 import java.util.List;
 
-public record RespostaAgente(String texto, List<ChamadaFerramenta> chamadas) {
+/**
+ * @param texto     a resposta que vai ao cliente
+ * @param iteracoes cada chamada à API do turno, com finish reason, tokens e tools pedidas (para o simulador)
+ */
+public record RespostaAgente(String texto, List<IteracaoTurno> iteracoes) {
 }
