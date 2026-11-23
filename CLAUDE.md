@@ -8,6 +8,12 @@ Projeto em fase inicial: uma demo do agente de atendimento está sendo construí
 
 É um projeto de estudos (o objetivo principal é aprender) e também portfólio para vaga júnior de backend Java. Prefira explicar o porquê das escolhas a só entregar código.
 
+## Fluxo de desenvolvimento
+
+- Para qualquer feature, refatoração ou mudança de comportamento com mais de uma etapa, use a skill `orquestrador-dev`.
+- Bugs, testes falhando ou comportamento inesperado começam por `superpowers:systematic-debugging`.
+- Convenções específicas de cada projeto (arquitetura, nomes, comandos de build e teste) estão no [`CLAUDE.md`](http://CLAUDE.md) do projeto e têm prioridade.
+
 ## Comandos
 
 Use o Maven Wrapper (`./mvnw` no Bash, `.\mvnw.cmd` no PowerShell):
