@@ -1,6 +1,7 @@
 package app.gestaoIAWpp.ai;
 
-import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_TELEFONE;
+import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_CLIENTE_ID;
+import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_EMPRESA_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -22,7 +23,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 class ToolsAgenteTest {
 
-    private static final String TEL = "5511999990000";
+    private static final java.util.UUID EMPRESA = java.util.UUID.randomUUID();
+    private static final java.util.UUID CLIENTE = java.util.UUID.randomUUID();
+    private static final String TEL = CLIENTE.toString();
 
     private EstoqueService estoque;
     private CarrinhoService carrinho;
@@ -37,7 +40,7 @@ class ToolsAgenteTest {
         carrinho = new CarrinhoService(produtos, estoque);
         carrinhoTool = new CarrinhoTool(carrinho);
         registry = new ToolRegistry(List.of(new ProdutoTool(new ProdutoService(produtos, estoque)), carrinhoTool));
-        ctx = new ToolContext(Map.of(CHAVE_TELEFONE, TEL));
+        ctx = new ToolContext(Map.of(CHAVE_EMPRESA_ID, EMPRESA, CHAVE_CLIENTE_ID, CLIENTE));
     }
 
     private ToolCallback callback(String nome) {
@@ -90,11 +93,11 @@ class ToolsAgenteTest {
     }
 
     @Test
-    void semTelefoneNoContextoFalhaComMensagemClara() {
-        var semTelefone = new ToolContext(Map.of("outra", "x"));
-        assertThatThrownBy(() -> carrinhoTool.adicionarAoCarrinho("P001", 1, semTelefone))
+    void semClienteNoContextoFalhaComMensagemClara() {
+        var semCliente = new ToolContext(Map.of("outra", "x"));
+        assertThatThrownBy(() -> carrinhoTool.adicionarAoCarrinho("P001", 1, semCliente))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Telefone ausente");
+                .hasMessageContaining("Cliente ausente");
         assertThat(estoque.consultar("P001")).isEqualTo(12);
     }
 

@@ -1,6 +1,7 @@
 package app.gestaoIAWpp.ai;
 
-import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_TELEFONE;
+import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_CLIENTE_ID;
+import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_EMPRESA_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -29,7 +30,9 @@ import tools.jackson.databind.json.JsonMapper;
  */
 class CaracterizacaoToolsTest {
 
-    private static final String TEL = "5511999990000";
+    private static final java.util.UUID EMPRESA = java.util.UUID.randomUUID();
+    private static final java.util.UUID CLIENTE = java.util.UUID.randomUUID();
+    private static final String TEL = CLIENTE.toString();
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     private static final String SAIDA_CARRINHO_P001_X2 =
@@ -46,7 +49,7 @@ class CaracterizacaoToolsTest {
         estoque = new EstoqueService();
         var carrinho = new CarrinhoService(produtos, estoque);
         registry = new ToolRegistry(List.of(new ProdutoTool(new ProdutoService(produtos, estoque)), new CarrinhoTool(carrinho)));
-        ctx = new ToolContext(Map.of(CHAVE_TELEFONE, TEL));
+        ctx = new ToolContext(Map.of(CHAVE_EMPRESA_ID, EMPRESA, CHAVE_CLIENTE_ID, CLIENTE));
     }
 
     private ToolCallback[] callbacks() {

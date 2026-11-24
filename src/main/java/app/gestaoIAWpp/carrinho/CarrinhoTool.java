@@ -11,7 +11,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/** Tools de carrinho expostas ao modelo; o telefone vem do {@link ToolContext}, nunca do modelo. */
+/** Tools de carrinho expostas ao modelo; o cliente vem do {@link ToolContext}, nunca do modelo. */
 @Component
 @Order(2)
 public class CarrinhoTool implements AgentTool {
@@ -37,7 +37,7 @@ public class CarrinhoTool implements AgentTool {
         if (quantidade == null) {
             throw new IllegalArgumentException("Parâmetro obrigatório ausente: quantidade.");
         }
-        return paraResponse(carrinho.adicionar(ContextoTool.telefone(ctx), produtoId, quantidade));
+        return paraResponse(carrinho.adicionar(ContextoTool.clienteId(ctx).toString(), produtoId, quantidade));
     }
 
     @Tool(name = "remover_do_carrinho", description = DESCRICAO_REMOVER)
@@ -46,13 +46,13 @@ public class CarrinhoTool implements AgentTool {
             @ToolParam(description = "Quantidade a remover. Omita para remover tudo.", required = false)
             Integer quantidade,
             ToolContext ctx) {
-        return paraResponse(carrinho.remover(ContextoTool.telefone(ctx), produtoId, quantidade));
+        return paraResponse(carrinho.remover(ContextoTool.clienteId(ctx).toString(), produtoId, quantidade));
     }
 
     @Tool(name = "ver_carrinho",
             description = "Mostra os itens do carrinho do cliente e o total.")
     public CarrinhoResponse verCarrinho(ToolContext ctx) {
-        return paraResponse(carrinho.ver(ContextoTool.telefone(ctx)));
+        return paraResponse(carrinho.ver(ContextoTool.clienteId(ctx).toString()));
     }
 
     private static CarrinhoResponse paraResponse(CarrinhoResumo r) {

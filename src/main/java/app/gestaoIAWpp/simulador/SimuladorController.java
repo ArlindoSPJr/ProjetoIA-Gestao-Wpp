@@ -3,11 +3,16 @@ package app.gestaoIAWpp.simulador;
 import app.gestaoIAWpp.ai.AgenteAtendimento;
 import app.gestaoIAWpp.ai.dto.AgenteResponse;
 import app.gestaoIAWpp.atendimento.AtendimentoService;
+import app.gestaoIAWpp.carrinho.CarrinhoResumo;
 import app.gestaoIAWpp.carrinho.CarrinhoService;
+import app.gestaoIAWpp.cliente.ClienteService;
 import app.gestaoIAWpp.produto.EstoqueService;
 import app.gestaoIAWpp.produto.ProdutoRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -25,14 +30,21 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/simulador")
 public class SimuladorController {
 
+    private static final String PREFIXO_USER_ID = "BR.SIM";
+
+    private final String phoneNumberId;
     private final AtendimentoService atendimento;
+    private final ClienteService clientes;
     private final AgenteAtendimento agente;
     private final CarrinhoService carrinho;
     private final EstoqueService estoque;
     private final ProdutoRepository produtos;
 
-    public SimuladorController(AtendimentoService atendimento, AgenteAtendimento agente,
+    public SimuladorController(@Value("${simulador.phone-number-id}") String phoneNumberId,
+            AtendimentoService atendimento, ClienteService clientes, AgenteAtendimento agente,
             CarrinhoService carrinho, EstoqueService estoque, ProdutoRepository produtos) {
+        this.phoneNumberId = phoneNumberId;
+        this.clientes = clientes;
         this.atendimento = atendimento;
         this.agente = agente;
         this.carrinho = carrinho;
@@ -42,7 +54,9 @@ public class SimuladorController {
 
     @PostMapping("/mensagens")
     public AgenteResponse mensagem(@RequestBody MensagemRequest request) {
-        return atendimento.processarMensagem(request.telefone(), request.texto());
+        String userId = userIdDoSimulador(request.telefone());
+        String telefone = userId == null ? null : userId.substring(PREFIXO_USER_ID.length());
+        return atendimento.processarMensagem(phoneNumberId, userId, telefone, request.texto());
     }
 
     @GetMapping("/estado")
@@ -50,7 +64,27 @@ public class SimuladorController {
         List<ItemEstoqueView> itens = produtos.listarTodos().stream()
                 .map(p -> new ItemEstoqueView(p.id(), p.nome(), p.preco(), estoque.consultar(p.id())))
                 .toList();
-        return new EstadoSimulador(carrinho.ver(telefone), itens);
+        String userId = userIdDoSimulador(telefone);
+        if (userId == null) {
+            throw new IllegalArgumentException("Telefone e texto são obrigatórios.");
+        }
+        UUID empresaId = atendimento.empresaDoNumero(phoneNumberId);
+        CarrinhoResumo resumo = clientes.buscar(empresaId, userId)
+                .map(c -> carrinho.ver(c.getId().toString()))
+                .orElseGet(() -> new CarrinhoResumo(List.of(), new BigDecimal("0.00")));
+        return new EstadoSimulador(resumo, itens);
+    }
+
+    /** Só dígitos, de 10 a 15; nulo se em branco. O user_id do simulador leva o prefixo BR.SIM. */
+    static String userIdDoSimulador(String telefone) {
+        if (telefone == null || telefone.isBlank()) {
+            return null;
+        }
+        String digitos = telefone.replaceAll("\\D", "");
+        if (digitos.length() < 10 || digitos.length() > 15) {
+            throw new IllegalArgumentException("Telefone inválido: use só números com DDI, ex.: 5511999990000.");
+        }
+        return PREFIXO_USER_ID + digitos;
     }
 
     @PostMapping("/reset")
