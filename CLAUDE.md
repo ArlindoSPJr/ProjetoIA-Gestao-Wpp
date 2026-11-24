@@ -36,7 +36,7 @@ Demo do simulador (precisa de `ANTHROPIC_API_KEY`): copie `.env.example` para `.
 
 Se o bot só responder "vou chamar um atendente", confira a ANTHROPIC_API_KEY e os logs (o `log.warn` do `AgenteSpringAi` mostra o erro).
 
-Cada iteração do loop (chamada à API: finish reason, tokens, tools pedidas) é registrada no `RegistroTurno` pelo `LimiteIteracoesAdvisor` e volta em `RespostaAgente.iteracoes`; a página mostra isso na seção "Iterações do último turno". A resposta do simulador é `{texto, iteracoes}`. Para ver o JSON de requisição e resposta de cada rodada no terminal, troque o `SimpleLoggerAdvisor` para DEBUG em `logging.level` no `application.yaml`.
+Cada iteração do loop (chamada à API: finish reason, tokens, tools pedidas) é registrada no `RegistroTurno` pelo `LimiteIteracoesAdvisor` e volta em `AgenteResponse.iteracoes`; a página mostra isso na seção "Iterações do último turno". A resposta do simulador é `{texto, iteracoes}`. Para ver o JSON de requisição e resposta de cada rodada no terminal, troque o `SimpleLoggerAdvisor` para DEBUG em `logging.level` no `application.yaml`.
 
 Modelo, effort e limite de iterações do agente ficam no bloco `agente:` do `application.yaml`. O `OutputConfig` (effort) vem do SDK da Anthropic que o Spring AI traz transitivamente; não há dependência direta de `anthropic-java` no `pom.xml`.
 
@@ -46,13 +46,13 @@ Plano da demo: `docs/superpowers/plans/2026-11-20-demo-agente-atendimento.md` (s
 
 ## Estrutura da demo (pacotes sob `app.gestaoIAWpp`)
 
-- `produto/`: `CatalogoMock` (8 produtos e estoque inicial em memória), `ProdutoRepository` + `ProdutoRepositoryEmMemoria` (busca por pontuação, tolerante a acento e pontuação), `ProdutoService` (busca e disponibilidade; a regra de negócio dos produtos mora aqui, não nas tools), `EstoqueService` (baixa/devolução atômicas).
-- `carrinho/`: `CarrinhoService`, um carrinho por telefone; adicionar baixa o estoque, remover devolve.
-- `agente/`: `AgenteAtendimento` (a porta da IA); `AgenteSpringAi` (monta o `ChatClient` com os advisors e roda o turno: memória por telefone, snapshot/restauração em caso de falha, fallback); `LimiteIteracoesAdvisor` (o `ToolCallingAdvisor` com teto de chamadas à API); `RegistroTurno` (iterações do turno); `FerramentasAgente` (as 5 tools com `@Tool`, só adaptador); prompt em `src/main/resources/prompts/sistema-atendimento.txt`. A memória de conversa de um telefone fica no `ChatMemory` compartilhado durante o turno; qualquer código futuro que limpe a memória de um telefone (handoff, `ENCERRADA`, expiração) precisa segurar o lock desse telefone (como o `responder` faz). O reset do simulador hoje não segura, o que é aceito na demo.
+- `produto/`: `CatalogoMock` (8 produtos e estoque inicial em memória), `ProdutoRepository` + `ProdutoRepositoryEmMemoria` (busca por pontuação, tolerante a acento e pontuação), `ProdutoService` (busca e disponibilidade; a regra de negócio dos produtos mora aqui, não nas tools), `EstoqueService` (baixa/devolução atômicas); `ProdutoTool` (as tools `consultar_produto` e `consultar_estoque`, só adaptador do `ProdutoService`).
+- `carrinho/`: `CarrinhoService`, um carrinho por telefone; adicionar baixa o estoque, remover devolve; `CarrinhoTool` (as tools do carrinho, só adaptador do `CarrinhoService`).
+- `ai/`: `AgenteAtendimento` (a porta da IA); `AgenteSpringAi` (monta o `ChatClient` com os advisors e roda o turno: memória por telefone, snapshot/restauração em caso de falha, fallback); `LimiteIteracoesAdvisor` (o `ToolCallingAdvisor` com teto de chamadas à API); `RegistroTurno` (iterações do turno); `ToolRegistry` (junta os `AgentTool` na ordem do `@Order`); `AgentTool` (interface marcadora das tools); `ContextoTool` (lê o telefone do `ToolContext`); `dto/` (os `*Response`). Para criar uma tool: um `@Component` num pacote de domínio que implementa `AgentTool`, com `@Order`; prompt em `src/main/resources/prompts/sistema-atendimento.txt`. A memória de conversa de um telefone fica no `ChatMemory` compartilhado durante o turno; qualquer código futuro que limpe a memória de um telefone (handoff, `ENCERRADA`, expiração) precisa segurar o lock desse telefone (como o `responder` faz). O reset do simulador hoje não segura, o que é aceito na demo.
 - `atendimento/`: `AtendimentoService.processarMensagem(telefone, texto)`, entrada agnóstica de canal (o futuro webhook do WhatsApp chama o mesmo serviço).
 - `simulador/`: endpoints REST `/api/simulador/*` e a página `src/main/resources/static/index.html`.
 
-Regra das camadas: as tools só delegam ao domínio (`ProdutoService`, `CarrinhoService`); nenhuma regra de negócio fica em `FerramentasAgente`. O telefone vem do `ToolContext` (preenchido pelo `AgenteSpringAi`), nunca do modelo: o modelo só informa ids, termo e quantidade.
+Regra das camadas: as tools só delegam ao domínio (`ProdutoService`, `CarrinhoService`); nenhuma regra de negócio fica em `ProdutoTool`/`CarrinhoTool`. O telefone vem do `ToolContext` via `ContextoTool` (preenchido pelo `AgenteSpringAi`), nunca do modelo: o modelo só informa ids, termo e quantidade.
 
 ## Stack
 

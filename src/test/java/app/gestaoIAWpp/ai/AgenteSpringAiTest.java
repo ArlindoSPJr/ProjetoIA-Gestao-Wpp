@@ -13,9 +13,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import app.gestaoIAWpp.carrinho.CarrinhoService;
+import app.gestaoIAWpp.carrinho.CarrinhoTool;
 import app.gestaoIAWpp.produto.EstoqueService;
 import app.gestaoIAWpp.produto.ProdutoRepositoryEmMemoria;
 import app.gestaoIAWpp.produto.ProdutoService;
+import app.gestaoIAWpp.produto.ProdutoTool;
 import com.anthropic.models.messages.OutputConfig;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,9 +56,9 @@ class AgenteSpringAiTest {
         var produtos = new ProdutoRepositoryEmMemoria();
         estoque = new EstoqueService();
         var carrinho = new CarrinhoService(produtos, estoque);
-        var ferramentas = new FerramentasAgente(new ProdutoService(produtos, estoque), carrinho);
+        var tools = new ToolRegistry(List.of(new ProdutoTool(new ProdutoService(produtos, estoque)), new CarrinhoTool(carrinho)));
         agente = new AgenteSpringAi(ChatClient.builder(chatModel),
-                ToolCallingManager.builder().maxTotalToolCalls(10).build(), ferramentas,
+                ToolCallingManager.builder().maxTotalToolCalls(10).build(), tools,
                 new AgenteProperties("claude-haiku-5-5", "low", 5));
     }
 

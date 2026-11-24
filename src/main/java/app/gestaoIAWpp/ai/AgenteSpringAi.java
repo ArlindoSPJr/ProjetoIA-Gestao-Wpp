@@ -24,7 +24,6 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.model.tool.ToolCallLimitExceededException;
 import org.springframework.ai.model.tool.ToolCallingManager;
-import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -65,7 +64,7 @@ public class AgenteSpringAi implements AgenteAtendimento {
      */
     private final AtomicLong geracao = new AtomicLong();
 
-    public AgenteSpringAi(ChatClient.Builder builder, ToolCallingManager manager, FerramentasAgente ferramentas,
+    public AgenteSpringAi(ChatClient.Builder builder, ToolCallingManager manager, ToolRegistry tools,
                           AgenteProperties props) {
         this.chatClient = builder
                 .defaultSystem(lerPrompt())
@@ -73,7 +72,7 @@ public class AgenteSpringAi implements AgenteAtendimento {
                         .model(props.modelo())
                         .maxTokens(MAX_TOKENS)
                         .effort(OutputConfig.Effort.of(props.effort())))
-                .defaultToolCallbacks(ToolCallbacks.from(ferramentas))
+                .defaultToolCallbacks(tools.callbacks())
                 .defaultAdvisors(
                         new LimiteIteracoesAdvisor(manager, props.maxIteracoes()),
                         MessageChatMemoryAdvisor.builder(memoria).order(ToolCallingAdvisor.DEFAULT_ORDER + 100).build(),
@@ -106,7 +105,7 @@ public class AgenteSpringAi implements AgenteAtendimento {
         try {
             resposta = chatClient.prompt()
                     .user(mensagem)
-                    .toolContext(Map.of(FerramentasAgente.CHAVE_TELEFONE, telefone, RegistroTurno.CHAVE, registro))
+                    .toolContext(Map.of(ContextoTool.CHAVE_TELEFONE, telefone, RegistroTurno.CHAVE, registro))
                     .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, telefone).param(RegistroTurno.CHAVE, registro))
                     .call()
                     .chatResponse();
