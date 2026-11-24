@@ -1,21 +1,23 @@
 package app.gestaoIAWpp.ai;
 
-import static app.gestaoIAWpp.ai.FerramentasAgente.CHAVE_TELEFONE;
+import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_TELEFONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import app.gestaoIAWpp.carrinho.CarrinhoService;
+import app.gestaoIAWpp.carrinho.CarrinhoTool;
 import app.gestaoIAWpp.produto.EstoqueService;
 import app.gestaoIAWpp.produto.ProdutoRepositoryEmMemoria;
 import app.gestaoIAWpp.produto.ProdutoService;
+import app.gestaoIAWpp.produto.ProdutoTool;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ToolContext;
-import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.execution.ToolExecutionException;
 import tools.jackson.databind.JsonNode;
@@ -36,19 +38,19 @@ class CaracterizacaoToolsTest {
 
     private EstoqueService estoque;
     private ToolContext ctx;
-    private FerramentasAgente ferramentas;
+    private ToolRegistry registry;
 
     @BeforeEach
     void setUp() {
         var produtos = new ProdutoRepositoryEmMemoria();
         estoque = new EstoqueService();
         var carrinho = new CarrinhoService(produtos, estoque);
-        ferramentas = new FerramentasAgente(new ProdutoService(produtos, estoque), carrinho);
+        registry = new ToolRegistry(List.of(new ProdutoTool(new ProdutoService(produtos, estoque)), new CarrinhoTool(carrinho)));
         ctx = new ToolContext(Map.of(CHAVE_TELEFONE, TEL));
     }
 
     private ToolCallback[] callbacks() {
-        return ToolCallbacks.from(ferramentas);
+        return registry.callbacks();
     }
 
     private ToolCallback callback(String nome) {

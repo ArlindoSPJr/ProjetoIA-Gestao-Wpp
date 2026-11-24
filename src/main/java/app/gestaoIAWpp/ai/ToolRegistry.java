@@ -6,11 +6,13 @@ import java.util.List;
 import java.util.Set;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.stereotype.Component;
 
 /**
  * Junta as tools de todos os {@link AgentTool} na ordem recebida e falha cedo se dois nomes
  * coincidirem. O despacho pelo nome da tool é feito pelo Spring AI.
  */
+@Component
 public class ToolRegistry {
 
     private final ToolCallback[] callbacks;
