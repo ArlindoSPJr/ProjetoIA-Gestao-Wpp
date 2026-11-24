@@ -49,6 +49,7 @@ Você é um revisor independente. Você **não** escreveu este código e não sa
 7. **Confira o design estrutural da spec (se houver).**
    - As classes, interfaces e dependências do diff batem com o diagrama de classes? Classe extra ou dependência fora do diagrama = IMPORTANTE.
    - Os patterns do diff são só os marcados como "Aprovado pelo humano? sim" na spec? Qualquer outro pattern ou abstração (factory, strategy, interface com uma única implementação, camada extra etc.) = IMPORTANTE, mesmo que já exista algo parecido no projeto.
+   - Exceção: usar um mecanismo que o CLAUDE.md documenta como o jeito padrão de fazer algo (por exemplo, criar uma tool como `@Component` que implementa `AgentTool`, ou acessar a IA pela interface `AgenteAtendimento`) não é pattern novo e não é achado. Criar um mecanismo novo parecido continua sendo.
    - Existe uma forma visivelmente mais simples de atender aos mesmos CA? Se sim, = IMPORTANTE, com o esboço da versão simples.
    - Cada classe tem a responsabilidade descrita, na camada indicada?
 8. **Confirme antes de reportar.** Cada achado precisa de um cenário concreto que quebra.

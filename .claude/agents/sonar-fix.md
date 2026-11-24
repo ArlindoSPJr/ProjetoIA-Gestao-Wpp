@@ -13,7 +13,11 @@ git log origin/main..HEAD --oneline | grep -c "^[0-9a-f]* fix(sonar):"
 - Se o resultado for **3 ou mais**: não altere nenhum arquivo. Adicione o label `needs-human` ao PR, comente no PR um resumo do que ainda reprova e **pare**.
 
 ## 2. Leia o que o Sonar apontou
-Use o SonarQube MCP, se estiver disponível. Senão, use a API do Sonar com `SONAR_HOST_URL`, `SONAR_TOKEN` e `SONAR_PROJECT_KEY`:
+Use a API do Sonar com `SONAR_HOST_URL`, `SONAR_TOKEN` e `SONAR_PROJECT_KEY`, sempre neste formato (é o único `curl` liberado no CI):
+```bash
+curl -sS --oauth2-bearer $SONAR_TOKEN $SONAR_HOST_URL/api/<endpoint>?<parâmetros>
+```
+Não ponha a URL entre aspas (isso quebra o prefixo liberado); escape o `&` com barra: `$SONAR_HOST_URL/api/issues/search?pullRequest=$PR_NUMBER\&resolved=false`.
 - status do Quality Gate do PR (`/api/qualitygates/project_status` com `pullRequest=<número>`);
 - issues abertos do PR (`/api/issues/search` com `pullRequest=<número>&resolved=false`);
 - cobertura e duplicação no código novo (`/api/measures/component` com `pullRequest=<número>`).
