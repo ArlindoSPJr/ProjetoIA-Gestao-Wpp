@@ -23,22 +23,22 @@ flowchart TD
 ### Diagrama de classes (só o que é novo ou alterado)
 ```mermaid
 classDiagram
-    class IExemploRepository {
+    class ExemploRepository {
         <<interface>>
-        +ObterPorId(id) Exemplo
+        +obterPorId(id) Exemplo
     }
     class ExemploService {
-        +Executar(cmd) Resultado
+        +executar(cmd) Resultado
     }
-    ExemploService --> IExemploRepository
+    ExemploService --> ExemploRepository
 ```
 
 ### Sequência do fluxo principal
 ```mermaid
 sequenceDiagram
-    Controller->>ExemploService: Executar(cmd)
-    ExemploService->>IExemploRepository: ObterPorId(id)
-    IExemploRepository-->>ExemploService: Exemplo
+    Controller->>ExemploService: executar(cmd)
+    ExemploService->>ExemploRepository: obterPorId(id)
+    ExemploRepository-->>ExemploService: Exemplo
     ExemploService-->>Controller: Resultado
 ```
 
