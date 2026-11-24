@@ -1,4 +1,4 @@
-package app.gestaoIAWpp.ai.dto;
+package app.gestaoIAWpp.carrinho.dto;
 
 import java.math.BigDecimal;
 import java.util.List;

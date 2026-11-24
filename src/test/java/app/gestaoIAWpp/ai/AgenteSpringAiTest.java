@@ -6,18 +6,20 @@ import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import app.gestaoIAWpp.carrinho.CarrinhoService;
 import app.gestaoIAWpp.carrinho.CarrinhoTool;
-import app.gestaoIAWpp.produto.EstoqueService;
-import app.gestaoIAWpp.produto.ProdutoRepositoryEmMemoria;
+import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.ProdutoService;
 import app.gestaoIAWpp.produto.ProdutoTool;
+import app.gestaoIAWpp.produto.VarianteRepository;
 import com.anthropic.models.messages.OutputConfig;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,17 +53,20 @@ class AgenteSpringAiTest {
     private static final UUID CLIENTE = UUID.randomUUID();
 
     private ChatModel chatModel;
-    private EstoqueService estoque;
+    private VarianteRepository variantes;
+    private String pretaM;
     private AgenteSpringAi agente;
 
     @BeforeEach
     void preparar() {
         chatModel = mock(ChatModel.class);
         when(chatModel.getOptions()).thenReturn(AnthropicChatOptions.builder().build());
-        var produtos = new ProdutoRepositoryEmMemoria();
-        estoque = new EstoqueService();
-        var carrinho = new CarrinhoService(produtos, estoque);
-        var tools = new ToolRegistry(List.of(new ProdutoTool(new ProdutoService(produtos, estoque)), new CarrinhoTool(carrinho)));
+        var catalogo = CatalogoTeste.lojaDemo(EMPRESA);
+        variantes = catalogo.varianteRepository();
+        pretaM = catalogo.variante("Camisa Básica (Preta / M)").getId().toString();
+        var carrinho = new CarrinhoService(variantes);
+        var tools = new ToolRegistry(List.of(new ProdutoTool(new ProdutoService(catalogo.produtoRepository(), variantes)),
+                new CarrinhoTool(carrinho)));
         agente = new AgenteSpringAi(ChatClient.builder(chatModel),
                 ToolCallingManager.builder().maxTotalToolCalls(10).build(), tools,
                 new AgenteProperties("claude-haiku-5-5", "low", 5));
@@ -168,19 +173,19 @@ class AgenteSpringAiTest {
         ToolResponseMessage tr = toolResult(prompts(2).get(1));
         assertThat(tr.getResponses()).hasSize(1);
         assertThat(tr.getResponses().get(0).id()).isEqualTo("t1");
-        assertThat(tr.getResponses().get(0).responseData()).contains("P001");
+        assertThat(tr.getResponses().get(0).responseData()).contains(pretaM);
     }
 
     @Test
     void paraNoLimiteDeIteracoesComFallback() {
         when(chatModel.call(any(Prompt.class))).thenAnswer(
-                i -> comTool("t", "adicionar_ao_carrinho", "{\"produtoId\":\"P001\",\"quantidade\":1}"));
+                i -> comTool("t", "adicionar_ao_carrinho", "{\"varianteId\":\"" + pretaM + "\",\"quantidade\":1}"));
 
         AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "quero uma camisa");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
         verify(chatModel, times(5)).call(any(Prompt.class));
-        assertThat(estoque.consultar("P001")).isEqualTo(8);
+        verify(variantes, times(4)).baixarEstoque(UUID.fromString(pretaM), 1);
         assertThat(r.iteracoes()).hasSize(5);
     }
 
@@ -238,7 +243,7 @@ class AgenteSpringAiTest {
     @Test
     void erroDaToolVoltaAoModelo() {
         when(chatModel.call(any(Prompt.class))).thenReturn(
-                comTool("t1", "adicionar_ao_carrinho", "{\"produtoId\":\"P001\",\"quantidade\":999}"),
+                comTool("t1", "adicionar_ao_carrinho", "{\"varianteId\":\"" + pretaM + "\",\"quantidade\":999}"),
                 texto("Não temos tudo isso."));
 
         AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "quero 999");
@@ -251,13 +256,13 @@ class AgenteSpringAiTest {
     @Test
     void entradaComFormatoInvalidoVoltaAoModeloComoErro() {
         when(chatModel.call(any(Prompt.class))).thenReturn(
-                comTool("t1", "adicionar_ao_carrinho", "{\"produtoId\":\"P001\",\"quantidade\":\"dois\"}"),
+                comTool("t1", "adicionar_ao_carrinho", "{\"varianteId\":\"" + pretaM + "\",\"quantidade\":\"dois\"}"),
                 texto("Quantas unidades?"));
 
         AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "quero duas");
 
         assertThat(r.texto()).isEqualTo("Quantas unidades?");
-        assertThat(estoque.consultar("P001")).isEqualTo(12);
+        verify(variantes, never()).baixarEstoque(any(), anyInt());
     }
 
     @Test

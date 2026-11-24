@@ -1,84 +1,96 @@
 package app.gestaoIAWpp.carrinho;
 
-import app.gestaoIAWpp.produto.EstoqueService;
-import app.gestaoIAWpp.produto.Produto;
-import app.gestaoIAWpp.produto.ProdutoNaoEncontradoException;
-import app.gestaoIAWpp.produto.ProdutoRepository;
+import app.gestaoIAWpp.produto.EstoqueInsuficienteException;
+import app.gestaoIAWpp.produto.Variante;
+import app.gestaoIAWpp.produto.VarianteNaoEncontradaException;
+import app.gestaoIAWpp.produto.VarianteRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
- * Carrinhos em memória, um por telefone. Adicionar reserva estoque e remover devolve.
- * Os métodos que mudam estado são synchronized para manter carrinho e estoque coerentes.
+ * Carrinhos ainda em memória, um por cliente, com o estoque já no banco (baixa e devolução atômicas
+ * pelo {@link VarianteRepository}). A assinatura é a final; a Task 5 leva o carrinho para o banco.
+ * Os métodos são synchronized para manter carrinho e estoque coerentes.
  */
 @Service
 public class CarrinhoService {
 
-    private final ProdutoRepository produtos;
-    private final EstoqueService estoque;
-    private final Map<String, LinkedHashMap<String, ItemCarrinho>> carrinhos = new HashMap<>();
+    private static final String QUANTIDADE_INVALIDA = "Quantidade deve ser maior que zero.";
 
-    public CarrinhoService(ProdutoRepository produtos, EstoqueService estoque) {
-        this.produtos = produtos;
-        this.estoque = estoque;
+    private final VarianteRepository variantes;
+    private final Map<UUID, LinkedHashMap<UUID, ItemCarrinhoResumo>> carrinhos = new HashMap<>();
+
+    public CarrinhoService(VarianteRepository variantes) {
+        this.variantes = variantes;
     }
 
-    public synchronized CarrinhoResumo adicionar(String telefone, String produtoId, int quantidade) {
-        Produto produto = produtos.buscarPorId(produtoId)
-                .orElseThrow(() -> new ProdutoNaoEncontradoException(produtoId));
-        estoque.baixar(produtoId, quantidade);
-        var itens = carrinhos.computeIfAbsent(telefone, t -> new LinkedHashMap<>());
+    public synchronized CarrinhoResumo adicionar(UUID empresaId, UUID clienteId, UUID varianteId, int quantidade) {
+        if (quantidade < 1) {
+            throw new IllegalArgumentException(QUANTIDADE_INVALIDA);
+        }
+        Variante variante = variantes.daEmpresa(varianteId, empresaId)
+                .orElseThrow(() -> new VarianteNaoEncontradaException(varianteId.toString()));
+        if (variantes.baixarEstoque(varianteId, quantidade) == 0) {
+            int disponivel = variantes.findById(varianteId).map(Variante::getQuantidadeEstoque).orElse(0);
+            throw new EstoqueInsuficienteException(varianteId, variante.nomeCompleto(), quantidade, disponivel);
+        }
+        var itens = carrinhos.computeIfAbsent(clienteId, c -> new LinkedHashMap<>());
         itens.merge(
-                produtoId,
-                new ItemCarrinho(produto.id(), produto.nome(), produto.preco(), quantidade),
-                (atual, novo) -> new ItemCarrinho(
-                        atual.produtoId(), atual.nome(), atual.precoUnitario(), atual.quantidade() + quantidade));
+                varianteId,
+                new ItemCarrinhoResumo(varianteId, variante.nomeCompleto(), variante.getPreco(), quantidade),
+                (atual, novo) -> new ItemCarrinhoResumo(
+                        atual.varianteId(), atual.nome(), atual.precoUnitario(), atual.quantidade() + quantidade));
         return resumir(itens);
     }
 
-    public synchronized CarrinhoResumo remover(String telefone, String produtoId, Integer quantidade) {
+    /** Sem quantidade (ou com mais do que há no carrinho), remove todas as unidades da variante. */
+    public synchronized CarrinhoResumo remover(UUID empresaId, UUID clienteId, UUID varianteId, Integer quantidade) {
         if (quantidade != null && quantidade < 1) {
-            throw new IllegalArgumentException("Quantidade deve ser maior que zero.");
+            throw new IllegalArgumentException(QUANTIDADE_INVALIDA);
         }
-        var itens = carrinhos.getOrDefault(telefone, new LinkedHashMap<>());
-        ItemCarrinho item = itens.get(produtoId);
+        var itens = carrinhos.getOrDefault(clienteId, new LinkedHashMap<>());
+        ItemCarrinhoResumo item = itens.get(varianteId);
         if (item == null) {
-            throw new ItemNaoEstaNoCarrinhoException(produtoId);
+            throw new ItemNaoEstaNoCarrinhoException(varianteId);
         }
         int removida = (quantidade == null || quantidade >= item.quantidade()) ? item.quantidade() : quantidade;
-        estoque.devolver(produtoId, removida);
+        variantes.devolverEstoque(varianteId, removida);
         if (removida == item.quantidade()) {
-            itens.remove(produtoId);
+            itens.remove(varianteId);
         } else {
-            itens.put(produtoId, new ItemCarrinho(
-                    item.produtoId(), item.nome(), item.precoUnitario(), item.quantidade() - removida));
+            itens.put(varianteId, new ItemCarrinhoResumo(
+                    item.varianteId(), item.nome(), item.precoUnitario(), item.quantidade() - removida));
         }
         return resumir(itens);
     }
 
-    public synchronized CarrinhoResumo ver(String telefone) {
-        return resumir(carrinhos.getOrDefault(telefone, new LinkedHashMap<>()));
+    public synchronized CarrinhoResumo ver(UUID clienteId) {
+        return resumir(carrinhos.getOrDefault(clienteId, new LinkedHashMap<>()));
     }
 
-    /** Não devolve estoque: o reset da demo reinicia o estoque à parte. */
-    public synchronized void limparTodos() {
+    /**
+     * Reset da demo: devolve ao estoque as unidades de todos os carrinhos e esvazia-os, na mesma seção
+     * crítica para um adicionar não cair no meio. O mapa em memória não guarda a empresa, então todos os
+     * carrinhos são reiniciados; a Task 5 restringe à empresa.
+     */
+    public synchronized void reiniciarDemo(UUID empresaId) {
+        for (var itens : carrinhos.values()) {
+            for (ItemCarrinhoResumo item : itens.values()) {
+                variantes.devolverEstoque(item.varianteId(), item.quantidade());
+            }
+        }
         carrinhos.clear();
     }
 
-    /** Limpa os carrinhos e reinicia o estoque na mesma seção crítica, para um adicionar não cair no meio. */
-    public synchronized void reiniciarTudo() {
-        carrinhos.clear();
-        estoque.reiniciar();
-    }
-
-    private CarrinhoResumo resumir(Map<String, ItemCarrinho> itens) {
+    private CarrinhoResumo resumir(Map<UUID, ItemCarrinhoResumo> itens) {
         var lista = new ArrayList<>(itens.values());
         BigDecimal total = lista.stream()
-                .map(ItemCarrinho::subtotal)
+                .map(ItemCarrinhoResumo::subtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2);
         return new CarrinhoResumo(lista, total);

@@ -32,6 +32,7 @@ Descrição curta: "sistema que transforma conversas de WhatsApp em pedidos regi
 
 ## Decisões tomadas
 - Stack: tudo em Java + Spring (sem serviço separado em Python)
+- Produtos têm variações normalizadas (opção, valor de opção, variante): preço e estoque ficam em cada variante (ex.: Camisa Básica Preta/M), e as tools trabalham com o id da variante
 
 ## Propostas (ainda não confirmadas)
 - Spring AI como camada de IA (alternativa: LangChain4j; não usar os dois)
@@ -49,7 +50,7 @@ Descrição curta: "sistema que transforma conversas de WhatsApp em pedidos regi
 
 ## Decisões em aberto (com opções levantadas)
 1. Mensagem inicial: A) menu fixo; B) conversa livre; C) híbrido (menu só se a mensagem for saudação pura); D) botões só em momentos de decisão. Avaliar unir "Fazer pedido" e "Buscar produto".
-2. Produtos têm variações (tamanho/cor) com estoque separado?
+2. ~~Produtos têm variações (tamanho/cor) com estoque separado?~~ Decidida: sim, ver "Decisões tomadas".
 3. Modelo do fluxo de pedido: linear rígido / linear com desvio / preenchimento de campos (slot filling)
 4. Entrega: delivery, retirada ou ambos; quais dados coletar
 5. Cálculo de frete: fixo, tabela por região, automático por CEP ou informado pelo atendente

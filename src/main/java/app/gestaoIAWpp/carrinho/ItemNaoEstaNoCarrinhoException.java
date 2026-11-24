@@ -1,8 +1,10 @@
 package app.gestaoIAWpp.carrinho;
 
+import java.util.UUID;
+
 public class ItemNaoEstaNoCarrinhoException extends RuntimeException {
 
-    public ItemNaoEstaNoCarrinhoException(String produtoId) {
-        super("Produto " + produtoId + " não está no carrinho.");
+    public ItemNaoEstaNoCarrinhoException(UUID varianteId) {
+        super("Variante " + varianteId + " não está no carrinho.");
     }
 }
