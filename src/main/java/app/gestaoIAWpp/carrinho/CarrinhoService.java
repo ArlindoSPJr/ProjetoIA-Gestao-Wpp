@@ -18,6 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>As queries nativas de escrita ({@code baixarEstoque}, {@code devolverEstoque}, {@code somarItem})
  * limpam o contexto de persistência ao terminar. Por isso o resumo é sempre montado com o carrinho
  * lido de novo depois delas: entidades carregadas antes ficam destacadas e com estoque antigo.
+ *
+ * <p>Concorrência: quem mexe nos itens ({@code adicionar}, {@code remover}) e o reset travam o carrinho
+ * ({@code SELECT ... FOR UPDATE}) antes de ler ou alterar itens, então não se intercalam no mesmo
+ * carrinho (RN14). A ordem das travas é sempre carrinho e depois variante, para não haver deadlock.
  */
 @Service
 public class CarrinhoService {
@@ -41,12 +45,14 @@ public class CarrinhoService {
         Variante variante = variantes.daEmpresa(varianteId, empresaId)
                 .orElseThrow(() -> new VarianteNaoEncontradaException(varianteId.toString()));
         String nome = variante.nomeCompleto();
+        // Trava o carrinho que já existe antes de baixar o estoque (ordem carrinho, depois variante).
+        Optional<Carrinho> existente = carrinhoAbertoTravado(empresaId, clienteId);
         if (variantes.baixarEstoque(varianteId, quantidade) == 0) {
             int disponivel = variantes.findById(varianteId).map(Variante::getQuantidadeEstoque).orElse(0);
             throw new EstoqueInsuficienteException(varianteId, nome, quantidade, disponivel);
         }
-        carrinhos.criarAbertoSeNaoExiste(empresaId, clienteId);
-        Carrinho carrinho = carrinhoAberto(empresaId, clienteId).orElseThrow();
+        // Sem carrinho, só cria depois de saber que há estoque: assim a falha não deixa carrinho vazio.
+        Carrinho carrinho = existente.orElseGet(() -> criarETravar(empresaId, clienteId));
         carrinhos.somarItem(carrinho.getId(), varianteId, quantidade);
         return resumoDoAberto(empresaId, clienteId);
     }
@@ -57,7 +63,7 @@ public class CarrinhoService {
         if (quantidade != null && quantidade < 1) {
             throw new IllegalArgumentException(QUANTIDADE_INVALIDA);
         }
-        Carrinho carrinho = carrinhoAberto(empresaId, clienteId)
+        Carrinho carrinho = carrinhoAbertoTravado(empresaId, clienteId)
                 .orElseThrow(() -> new ItemNaoEstaNoCarrinhoException(varianteId));
         ItemCarrinho item = carrinho.item(varianteId)
                 .orElseThrow(() -> new ItemNaoEstaNoCarrinhoException(varianteId));
@@ -81,12 +87,14 @@ public class CarrinhoService {
 
     /**
      * RN14: devolve ao estoque os itens dos carrinhos ABERTO da empresa e apaga esses carrinhos (os
-     * itens vão junto pelo ON DELETE CASCADE). As devoluções são lidas antes do primeiro UPDATE, que
-     * destaca as entidades e impediria carregar os itens ainda não lidos.
+     * itens vão junto pelo ON DELETE CASCADE). Os carrinhos são travados antes de ler os itens: um
+     * {@code adicionar} em andamento termina antes, e o reset devolve a quantidade já somada. As
+     * devoluções são lidas antes do primeiro UPDATE, que destaca as entidades e impediria carregar os
+     * itens ainda não lidos.
      */
     @Transactional
     public void reiniciarDemo(UUID empresaId) {
-        List<Carrinho> abertos = carrinhos.findByEmpresaIdAndStatus(empresaId, StatusCarrinho.ABERTO);
+        List<Carrinho> abertos = carrinhos.travarDaEmpresa(empresaId, StatusCarrinho.ABERTO);
         List<Devolucao> devolucoes = abertos.stream()
                 .flatMap(c -> c.getItens().stream())
                 .map(i -> new Devolucao(i.getVariante().getId(), i.getQuantidade()))
@@ -100,6 +108,24 @@ public class CarrinhoService {
     private Optional<Carrinho> carrinhoAberto(UUID empresaId, UUID clienteId) {
         return carrinhos.findByClienteIdAndStatus(clienteId, StatusCarrinho.ABERTO)
                 .filter(c -> c.getEmpresaId().equals(empresaId));
+    }
+
+    /** Como {@link #carrinhoAberto}, mas travado até o fim da transação. */
+    private Optional<Carrinho> carrinhoAbertoTravado(UUID empresaId, UUID clienteId) {
+        return carrinhos.travarDoCliente(clienteId, StatusCarrinho.ABERTO)
+                .filter(c -> c.getEmpresaId().equals(empresaId));
+    }
+
+    /**
+     * Cria (se preciso) e trava o carrinho ABERTO. Se um reset apagou o carrinho entre o INSERT e a
+     * trava (o INSERT não criou porque o carrinho existia e o reset o segurava), cria de novo, uma vez.
+     */
+    private Carrinho criarETravar(UUID empresaId, UUID clienteId) {
+        carrinhos.criarAbertoSeNaoExiste(empresaId, clienteId);
+        return carrinhoAbertoTravado(empresaId, clienteId).orElseGet(() -> {
+            carrinhos.criarAbertoSeNaoExiste(empresaId, clienteId);
+            return carrinhoAbertoTravado(empresaId, clienteId).orElseThrow();
+        });
     }
 
     private CarrinhoResumo resumoDoAberto(UUID empresaId, UUID clienteId) {

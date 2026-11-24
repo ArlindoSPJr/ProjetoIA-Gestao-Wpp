@@ -34,10 +34,12 @@ public final class CarrinhoTeste {
         CarrinhoRepository repo = mock(CarrinhoRepository.class);
         when(repo.criarAbertoSeNaoExiste(any(), any())).thenAnswer(inv -> criarAberto(inv.getArgument(0),
                 inv.getArgument(1)));
-        when(repo.findByClienteIdAndStatus(any(), any())).thenAnswer(inv -> carrinhos.stream()
-                .filter(c -> c.getClienteId().equals(inv.getArgument(0)) && c.getStatus() == inv.getArgument(1))
-                .findFirst());
-        when(repo.findByEmpresaIdAndStatus(any(), any())).thenAnswer(inv -> carrinhos.stream()
+        when(repo.findByClienteIdAndStatus(any(), any())).thenAnswer(inv -> doCliente(inv.getArgument(0),
+                inv.getArgument(1)));
+        // Sem concorrência na memória, travar é o mesmo que buscar.
+        when(repo.travarDoCliente(any(), any())).thenAnswer(inv -> doCliente(inv.getArgument(0),
+                inv.getArgument(1)));
+        when(repo.travarDaEmpresa(any(), any())).thenAnswer(inv -> carrinhos.stream()
                 .filter(c -> c.getEmpresaId().equals(inv.getArgument(0)) && c.getStatus() == inv.getArgument(1))
                 .toList());
         when(repo.somarItem(any(), any(), anyInt())).thenAnswer(inv -> somarItem(inv.getArgument(0),
@@ -48,6 +50,12 @@ public final class CarrinhoTeste {
             return null;
         }).when(repo).deleteAllByIdInBatch(any());
         return repo;
+    }
+
+    private Optional<Carrinho> doCliente(UUID clienteId, StatusCarrinho status) {
+        return carrinhos.stream()
+                .filter(c -> c.getClienteId().equals(clienteId) && c.getStatus() == status)
+                .findFirst();
     }
 
     private int criarAberto(UUID empresaId, UUID clienteId) {

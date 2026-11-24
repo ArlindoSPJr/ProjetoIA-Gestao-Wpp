@@ -11,6 +11,12 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -176,6 +182,61 @@ class CarrinhoServiceIT {
 		service.reiniciarDemo(empresa);
 
 		assertThat(estoques()).isEqualTo(doSeed);
+	}
+
+	@Test
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
+	@DisplayName("T21 RN14 reset espera o adicionar em andamento no mesmo carrinho e devolve tudo")
+	void deveDevolverTodoEstoque_quandoResetConcorreComAdicionar() throws Exception {
+		UUID empresa = lojaDemo();
+		Map<UUID, Integer> doSeed = estoques();
+		UUID cliente = novoCliente(empresa);
+		UUID pretaM = camisaBasica(12);
+		TransactionTemplate tx = new TransactionTemplate(transactionManager);
+		CountDownLatch adicionou = new CountDownLatch(1);
+		CountDownLatch podeCommitar = new CountDownLatch(1);
+		ExecutorService threads = Executors.newFixedThreadPool(2);
+		try {
+			service.adicionar(empresa, cliente, pretaM, 2);
+
+			// Thread 1: adicionar dentro de uma transação que só commita quando o teste mandar.
+			Future<?> adicionar = threads.submit(() -> tx.executeWithoutResult(status -> {
+				service.adicionar(empresa, cliente, pretaM, 1);
+				adicionou.countDown();
+				aguardar(podeCommitar);
+			}));
+			assertThat(adicionou.await(10, TimeUnit.SECONDS)).isTrue();
+
+			// Thread 2: o reset começa enquanto o adicionar ainda não commitou.
+			Future<?> reset = threads.submit(() -> service.reiniciarDemo(empresa));
+			assertThatThrownBy(() -> reset.get(1, TimeUnit.SECONDS)).isInstanceOf(TimeoutException.class);
+
+			podeCommitar.countDown();
+			adicionar.get(10, TimeUnit.SECONDS);
+			reset.get(10, TimeUnit.SECONDS);
+
+			assertThat(estoques()).isEqualTo(doSeed);
+			assertThat(carrinhosAbertos(empresa)).isZero();
+		} finally {
+			podeCommitar.countDown();
+			threads.shutdownNow();
+			assertThat(threads.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+			service.reiniciarDemo(empresa);
+			// Se o reset perdeu estoque, devolve os valores do seed para não contaminar os outros testes.
+			doSeed.forEach((id, qtd) -> jdbc.update("UPDATE variante SET quantidade_estoque = ? WHERE id = ?", qtd, id));
+			jdbc.update("DELETE FROM cliente WHERE id = ?", cliente);
+		}
+	}
+
+	private static void aguardar(CountDownLatch latch) {
+		try {
+			if (!latch.await(10, TimeUnit.SECONDS)) {
+				throw new IllegalStateException("O teste não liberou o commit em 10 s.");
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException(e);
+		}
 	}
 
 	@Test

@@ -7,11 +7,14 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.VarianteNaoEncontradaException;
 import app.gestaoIAWpp.produto.VarianteRepository;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -162,5 +165,23 @@ class CarrinhoServiceTest {
                 .hasMessage("Variante " + inexistente + " não encontrada.");
         verify(variantes, never()).baixarEstoque(any(), anyInt());
         verifyNoInteractions(carrinhos);
+    }
+    @Test
+    @DisplayName("RN14 reset apaga o carrinho logo depois de criado: adicionar cria de novo e grava o item")
+    void deveRecriarCarrinhoEGravarItem_quandoResetApagaCarrinhoRecemCriado() {
+        when(carrinhos.travarDoCliente(CLIENTE, StatusCarrinho.ABERTO))
+                .thenReturn(Optional.empty())
+                .thenAnswer(inv -> {
+                    // Simula o reset: apaga o carrinho entre o INSERT e a trava.
+                    carrinhos.findByClienteIdAndStatus(CLIENTE, StatusCarrinho.ABERTO)
+                            .ifPresent(c -> carrinhos.deleteAllByIdInBatch(List.of(c.getId())));
+                    return Optional.empty();
+                })
+                .thenAnswer(inv -> carrinhos.findByClienteIdAndStatus(CLIENTE, StatusCarrinho.ABERTO));
+
+        CarrinhoResumo r = carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 2);
+
+        assertThat(r.itens()).singleElement().satisfies(i -> assertThat(i.quantidade()).isEqualTo(2));
+        assertThat(carrinho.ver(CLIENTE)).isEqualTo(r);
     }
 }

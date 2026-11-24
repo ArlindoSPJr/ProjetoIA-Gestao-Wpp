@@ -1,9 +1,11 @@
 package app.gestaoIAWpp.carrinho;
 
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -38,5 +40,16 @@ public interface CarrinhoRepository extends JpaRepository<Carrinho, UUID> {
     int somarItem(@Param("carrinhoId") UUID carrinhoId, @Param("varianteId") UUID varianteId,
             @Param("quantidade") int quantidade);
 
-    List<Carrinho> findByEmpresaIdAndStatus(UUID empresaId, StatusCarrinho status);
+    /**
+     * O carrinho ABERTO do cliente, travado ({@code SELECT ... FOR UPDATE}) até o fim da transação.
+     * Quem altera itens e o reset passam por esta trava, então não se intercalam no mesmo carrinho.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Carrinho c where c.clienteId = :clienteId and c.status = :status")
+    Optional<Carrinho> travarDoCliente(@Param("clienteId") UUID clienteId, @Param("status") StatusCarrinho status);
+
+    /** RN14: os carrinhos da empresa no status dado, travados até o fim da transação (ver {@link #travarDoCliente}). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Carrinho c where c.empresaId = :empresaId and c.status = :status")
+    List<Carrinho> travarDaEmpresa(@Param("empresaId") UUID empresaId, @Param("status") StatusCarrinho status);
 }
