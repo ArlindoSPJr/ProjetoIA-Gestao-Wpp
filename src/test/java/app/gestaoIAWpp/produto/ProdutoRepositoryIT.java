@@ -59,6 +59,20 @@ class ProdutoRepositoryIT {
 	}
 
 	@Test
+	@DisplayName("RN07 variante ativa de produto inativo não é achada para adicionar")
+	void deveNaoAcharVariante_quandoProdutoInativo() {
+		UUID calcaFeminina = jdbc.queryForObject("""
+				SELECT v.id FROM variante v JOIN produto p ON p.id = v.produto_id
+				WHERE p.nome = 'Calça Jeans Feminina'
+				""", UUID.class);
+		assertThat(variantes.daEmpresa(calcaFeminina, lojaDemo())).isPresent();
+
+		jdbc.update("UPDATE produto SET ativo = false WHERE nome = 'Calça Jeans Feminina'");
+
+		assertThat(variantes.daEmpresa(calcaFeminina, lojaDemo())).isEmpty();
+	}
+
+	@Test
 	@DisplayName("Review Focus: catálogo com variantes, valores e opções em no máximo 4 statements")
 	void deveCarregarCatalogoSemNMais1_quandoPercorreColecoes() {
 		UUID empresa = lojaDemo();
