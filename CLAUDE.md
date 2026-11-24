@@ -112,7 +112,7 @@ Regra das camadas: as tools só delegam ao domínio (`ProdutoService`, `Carrinho
 
 - Java 21, Spring Boot 4.2.0 (starters separados no estilo do Boot 4: `spring-boot-starter-webmvc`, `spring-boot-starter-flyway` e os `*-test` correspondentes)
 - Spring AI 2.1 (`spring-ai-starter-model-anthropic`): tools com `@Tool`, loop de tool calling pelo `ToolCallingAdvisor` (aqui estendido pelo `LimiteIteracoesAdvisor`) e histórico por cliente com `MessageChatMemoryAdvisor`. pgvector e o advisor de RAG ficam para a etapa de RAG.
-- PostgreSQL (Supabase) + Spring Data JPA (Hibernate) + Flyway para o schema. As migrations vão em `src/main/resources/db/migration`; dados da demo em `src/main/resources/db/demo`.
+- PostgreSQL (Supabase) + Spring Data JPA (Hibernate) + Flyway para o schema. As migrations vão em `src/main/resources/db/migration`; dados da demo em `src/main/resources/db/demo`. Toda tabela nova no `public` precisa de `ENABLE ROW LEVEL SECURITY` na mesma migration (o `RlsIT` falha se faltar); a `flyway_schema_history` é tratada pelo callback `afterMigrate.sql`.
 - Testes de integração com Testcontainers (`postgres:17`), via `maven-failsafe-plugin`.
 - Pacote base: `app.gestaoIAWpp`
 
