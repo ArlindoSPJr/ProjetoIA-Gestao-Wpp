@@ -28,6 +28,30 @@ class ProdutoServiceTest {
         assertThat(r.mensagem()).isNull();
     }
 
+    @Test
+    @DisplayName("T11 palavra só em valor de opção pontua 1 e basta para o produto aparecer")
+    void deveEncontrarProduto_quandoTermoCasaSoValorDeOpcao() {
+        var r = service(CatalogoTeste.lojaDemo(EMPRESA)).buscar(EMPRESA, "azul");
+
+        assertThat(r.produtos()).extracting(ProdutoResumo::nome).containsExactly("Camisa Polo");
+        assertThat(r.totalEncontrado()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("T11 valor de opção que só existe em variante inativa não pontua")
+    void deveIgnorarValorDeOpcao_quandoSoEmVarianteInativa() {
+        var c = new CatalogoTeste(EMPRESA);
+        Produto camisa = c.produto("Camisa Lisa", "algodão", "camisa");
+        ValorOpcao[] cor = c.opcao(camisa, "Cor", 0, "Verde", "Azul");
+        c.varianteInativa(camisa, "10.00", 5, cor[0]);
+        c.variante(camisa, "10.00", 5, cor[1]);
+
+        var r = service(c).buscar(EMPRESA, "verde");
+
+        assertThat(r.produtos()).isEmpty();
+        assertThat(r.totalEncontrado()).isZero();
+    }
+
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"de", "a"})
@@ -163,6 +187,7 @@ class ProdutoServiceTest {
     }
 
     @Test
+    @DisplayName("T20 variante da empresa é devolvida por varianteDaEmpresa")
     void deveDevolverAVariante_quandoEhDaEmpresa() {
         var c = CatalogoTeste.lojaDemo(EMPRESA);
         Variante pretaM = c.variante("Camisa Básica (Preta / M)");
@@ -171,6 +196,7 @@ class ProdutoServiceTest {
     }
 
     @Test
+    @DisplayName("RN09 variantes do produto vêm na ordem da posição dos valores (palavra na descrição pontua 1)")
     void deveOrdenarVariantesPelaPosicaoDosValores_quandoBuscaDevolveOProduto() {
         var r = service(CatalogoTeste.lojaDemo(EMPRESA)).buscar(EMPRESA, "algodao");
 
