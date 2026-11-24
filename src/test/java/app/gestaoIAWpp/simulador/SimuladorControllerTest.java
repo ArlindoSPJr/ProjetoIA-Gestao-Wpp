@@ -165,6 +165,15 @@ class SimuladorControllerTest {
     }
 
     @Test
+    @DisplayName("T27 estado com telefone em branco retorna 400 sem consultar a empresa")
+    void deveRetornar400ComMensagemDoTelefone_quandoEstadoComTelefoneEmBranco() throws Exception {
+        mvc.perform(get("/api/simulador/estado").param("telefone", " "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erro").value("Telefone é obrigatório."));
+        verify(atendimento, never()).empresaDoNumero(anyString());
+    }
+
+    @Test
     void jsonMalformadoRetorna400() throws Exception {
         mvc.perform(post("/api/simulador/mensagens").contentType(MediaType.APPLICATION_JSON).content("{"))
                 .andExpect(status().isBadRequest())

@@ -60,7 +60,7 @@ public class SimuladorController {
     public EstadoSimulador estado(@RequestParam String telefone) {
         String userId = userIdDoSimulador(telefone);
         if (userId == null) {
-            throw new IllegalArgumentException("Telefone e texto são obrigatórios.");
+            throw new IllegalArgumentException("Telefone é obrigatório.");
         }
         UUID empresaId = atendimento.empresaDoNumero(phoneNumberId);
         List<ItemEstoqueView> itens = produtos.listarVariantes(empresaId).stream()
