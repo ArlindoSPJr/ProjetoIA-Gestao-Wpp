@@ -293,3 +293,32 @@ Nenhuma fase tem 3+ tarefas paralelas, então nenhuma vai para o Orca.
 **Arquivos tocados por mais de uma tarefa:** `carrinho/CarrinhoTool.java` (T3, T4), `carrinho/CarrinhoService.java` e `CarrinhoServiceTest.java` (T4, T5), `simulador/SimuladorController.java` e `SimuladorControllerTest.java` (T3, T4, T5), `ai/CaracterizacaoToolsTest.java` (T3, T4).
 
 **Ordem de merge:** T1 → T2 → T3 → T4 → T5, todas commitadas direto na `feat/banco-catalogo-carrinho`, com `./mvnw verify` passando depois de cada uma.
+
+---
+
+### Task 6: RLS em todas as tabelas do `public` (alteração aprovada da spec)
+
+| Campo | Valor |
+|---|---|
+| ID | T6 (Fase 6) |
+| CA/RN | RN16, CA18, D12 |
+| Arquivos permitidos | `src/main/resources/db/migration/V3__habilita_rls.sql`, `src/test/java/app/gestaoIAWpp/RlsIT.java`, `CLAUDE.md` (uma linha na parte de migrations) |
+| Arquivos proibidos | todo `src/main/java/**`, migrations existentes (V1, V2), `pom.xml` |
+| Dependências | T5 |
+| Tipo | SEQUENCIAL |
+| Tamanho | PEQUENA |
+
+Matriz: T29.
+
+**Files:**
+- Create: `src/main/resources/db/migration/V3__habilita_rls.sql`
+- Create: `src/test/java/app/gestaoIAWpp/RlsIT.java`
+- Modify: `CLAUDE.md`
+
+- [ ] **Step 1: Escrever `RlsIT` (T29)** — `@DataJpaTest` + `@AutoConfigureTestDatabase(replace = NONE)` + `@Import(TestcontainersConfiguration.class)`, `JdbcTemplate`: `deveTerRlsEmTodasAsTabelas_quandoMigrationsAplicadas` — `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity` → lista vazia (a mensagem de falha mostra os nomes). Asserção extra: a consulta sem o filtro `NOT relrowsecurity` devolve ao menos as 10 tabelas e a `flyway_schema_history` (o teste não passa vazio por engano).
+- [ ] **Step 2: `./mvnw verify -Dit.test=RlsIT`** → falha listando as 11 tabelas.
+- [ ] **Step 3: `V3__habilita_rls.sql`** — `ALTER TABLE <t> ENABLE ROW LEVEL SECURITY;` para `empresa`, `numero_whatsapp`, `produto`, `opcao`, `valor_opcao`, `variante`, `variante_valor`, `cliente`, `carrinho`, `item_carrinho` e `flyway_schema_history`. Sem `FORCE` e sem policies (comentário no topo explicando: o dono das tabelas, usado pela aplicação, ignora o RLS; isso fecha a API REST do Supabase).
+- [ ] **Step 4: CLAUDE.md** — na descrição das migrations, uma linha: toda tabela nova no `public` precisa de `ENABLE ROW LEVEL SECURITY` na mesma migration (o `RlsIT` falha se faltar).
+- [ ] **Step 5: `./mvnw test` e `./mvnw verify`** → passam (os demais `*IT` provam que a aplicação continua lendo e gravando).
+- [ ] **Step 6: Aplicar no Supabase** — subir a aplicação uma vez (`./mvnw spring-boot:run` com `--server.port=8091` se a 8080 estiver ocupada) até o log do Flyway mostrar a V3 aplicada, conferir `GET /api/simulador/estado?telefone=5511999990000` → 200, e parar a aplicação.
+- [ ] **Step 7: Commit** `feat: RLS em todas as tabelas do public (fecha a API REST do Supabase)`.

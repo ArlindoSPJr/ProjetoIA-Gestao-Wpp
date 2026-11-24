@@ -1,5 +1,5 @@
 # Banco etapa 1: catálogo com variações e carrinho no PostgreSQL (Supabase)
-Status: aprovada (2026-11-24)
+Status: aprovada (2026-11-24); alteração RN16/CA18/T29/D12 (RLS) aprovada (2026-11-24)
 
 ## Problema e objetivo
 A demo guarda o catálogo (`CatalogoMock`), o estoque (`EstoqueService`) e os carrinhos (`CarrinhoService`) em memória. Ao reiniciar a aplicação tudo se perde, e o estoque baixado por um carrinho em memória não tem garantia transacional. Esta etapa passa essas três peças para o PostgreSQL do Supabase, já no modelo multiempresa e com variações de produto (tamanho, cor, marca) que foi desenhado no brainstorming (artefato "Modelo do Banco Gestão Wpp", v3). Para o cliente no simulador, o comportamento continua o mesmo. Para o agente, as tools passam a trabalhar com variantes.
@@ -200,6 +200,7 @@ Nenhum: solução simples atende. Repositórios Spring Data e services diretos. 
 | D9 | Chave da memória e do lock do agente | telefone; `clienteId` | `clienteId` | o mesmo telefone em duas empresas é outro cliente | sim |
 | D10 | Busca | Java sobre o catálogo carregado; SQL `ILIKE`/`unaccent`; full text | Java (algoritmo atual) | catálogo da demo é pequeno; reaproveita a lógica testada | sim |
 | D11 | Schema | Hibernate `ddl-auto`; Flyway | Flyway cria, Hibernate só valida (`ddl-auto: validate`) | schema versionado e revisável | — |
+| D12 | Acesso pela API REST do Supabase (PostgREST, chave `anon`) | deixar aberto; RLS com policies por empresa; RLS ligado sem policies; tirar o `public` da API | RLS ligado em todas as tabelas do `public`, sem policies (adicionado em 2026-11-24, após a aprovação inicial) | a aplicação conecta como dona das tabelas e ignora o RLS; a API do Supabase fica sem acesso; policies por empresa só fazem sentido com Supabase Auth, que não usamos | sim |
 
 ## Regras de negócio
 - RN01: O estoque de uma variante nunca fica negativo. A baixa é um único `UPDATE ... WHERE quantidade_estoque >= q`; 0 linhas afetadas = estoque insuficiente.
@@ -217,6 +218,7 @@ Nenhum: solução simples atende. Repositórios Spring Data e services diretos. 
 - RN13: Cada variante tem exatamente um valor de cada opção do seu produto, e só valores de opções do seu produto. Nesta etapa o catálogo só vem do seed, então a regra é garantida por um teste sobre os dados do seed.
 - RN14: O reset devolve ao estoque as quantidades de todos os itens dos carrinhos `ABERTO` da empresa da demo, apaga esses carrinhos e limpa a memória do agente. Clientes e catálogo continuam.
 - RN15: Telefone guardado só com dígitos, com DDI (CHECK `^[0-9]{10,15}$`, nulo permitido). Documento da empresa só com dígitos, 11 (CPF) ou 14 (CNPJ).
+- RN16: Toda tabela do schema `public` tem Row Level Security ligado, inclusive a `flyway_schema_history`, e nenhuma policy é criada nesta etapa. Assim os papéis `anon` e `authenticated` da API REST do Supabase não leem nem alteram nada, e a aplicação (dona das tabelas) continua com acesso total. Toda migration futura que criar tabela no `public` liga o RLS nela.
 
 ## Critérios de aceite (testáveis)
 - CA01: Dado o banco vazio, quando a aplicação sobe, então o Flyway cria as 10 tabelas e aplica o seed, e o Hibernate valida o mapeamento sem erro.
@@ -235,6 +237,7 @@ Nenhum: solução simples atende. Repositórios Spring Data e services diretos. 
 - CA14: Dado o seed, então toda variante tem exatamente um valor de cada opção do seu produto (RN13).
 - CA15: Dada uma variante inativa ou de produto inativo, então ela não aparece na busca e não pode ser adicionada.
 - CA16: `./mvnw test` passa sem Docker e sem banco; `./mvnw verify` roda também os `*IT` com PostgreSQL 17 no Testcontainers.
+- CA18: Dadas as migrations aplicadas, então toda tabela do schema `public` tem `relrowsecurity = true` e a aplicação continua lendo e gravando (os demais `*IT` passam).
 - CA17: A página do simulador continua funcionando: o painel de estoque lista as 8 variantes (nome do produto + opções, preço, quantidade) e o carrinho mostra os itens com o nome da RN10.
 
 ## Matriz de testes
@@ -268,6 +271,7 @@ Nenhum: solução simples atende. Repositórios Spring Data e services diretos. 
 | T26 | D9 | memória e lock por `clienteId` | partição | dois clientes → memórias separadas; o `ToolContext` leva os dois ids | unit (`AgenteSpringAiTest`) |
 | T27 | CA17 | `/estado` e `/reset` do simulador | contrato | `/estado` → carrinho + lista de variantes; `/reset` → 204 e `reiniciarDemo` chamado | unit (`SimuladorControllerTest`, `@WebMvcTest`) |
 | T28 | RN15 | CHECK de telefone e documento | limite | telefone com "+" ou 9 dígitos → violação; 10 e 15 dígitos → aceito | integração |
+| T29 | RN16, CA18 | RLS em todas as tabelas do `public` | regra | `pg_class` das tabelas do `public` com `relrowsecurity = false` → 0 linhas (falha se uma tabela nova nascer sem RLS) | integração (`RlsIT`) |
 
 ## Casos de borda e erros
 - Termo de busca nulo ou vazio: lista vazia com a mensagem de "nenhum encontrado" (T12).
@@ -285,7 +289,7 @@ Nenhum: solução simples atende. Repositórios Spring Data e services diretos. 
 - **APIs públicas:** `AgenteAtendimento.responder` e `AtendimentoService.processarMensagem` mudam de assinatura. O contrato HTTP do simulador (`/mensagens`, `/estado`, `/reset`) mantém as rotas; o JSON de `/estado` passa a listar variantes (campo `varianteId` em vez de `produtoId`), e o `index.html` acompanha.
 - **Contrato com o modelo:** os 5 nomes de tool continuam; parâmetros e respostas mudam (D5). O prompt troca "ids de produto" por "ids de variante" e orienta a usar a grade para oferecer outro tamanho ou cor.
 - **Testes:** `./mvnw test` sem banco; `./mvnw verify` com os `*IT`. `GestaoIaWppApplicationTests` vira `GestaoIaWppApplicationIT`. Se a configuração do PIT estiver no `pom.xml` no momento do merge, ela exclui `*IT`.
-- **Segurança:** `empresaId`/`clienteId` só pelo `ToolContext` (RN06). Senha do banco só no `.env`.
+- **Segurança:** `empresaId`/`clienteId` só pelo `ToolContext` (RN06). Senha do banco só no `.env`. RLS ligado em todas as tabelas do `public` pela migration `V3__habilita_rls.sql` (RN16), fechando a API REST do Supabase.
 - **Performance:** a busca carrega o catálogo ativo da empresa a cada chamada (poucas dezenas de linhas na demo) e deve usar um número fixo de consultas, sem N+1 (fetch das coleções numa consulta ou `@BatchSize`; coleções como `Set` para evitar `MultipleBagFetchException`). O banco fica em us-east-2: cerca de 150 ms por ida e volta.
 - **Dados existentes:** nenhum (o banco está vazio). Os ids `P001`–`P008` deixam de existir.
 - **Documentação:** CLAUDE.md (estrutura da demo, comandos `test`/`verify`, banco ligado) e `docs/contexto.md` (decisão em aberto 2, variações, passa a decidida).
