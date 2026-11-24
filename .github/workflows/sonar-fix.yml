@@ -81,7 +81,8 @@ jobs:
 
       - name: Rodar o agente sonar-fix
         if: steps.ctx.outputs.skip == 'false'
-        uses: anthropics/claude-code-action@v1
+        # Fixada pelo SHA (Sonar githubactions:S7637): uma tag pode ser movida para outro código.
+        uses: anthropics/claude-code-action@eb56b6666facdbd501035f4a0269d8caee2e7a8b # v1.0.289
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
