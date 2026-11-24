@@ -40,11 +40,13 @@ Antes de declarar qualquer dependência no `pom.xml`, confirme que ela existe e 
 
 2. **É a dependência certa**: groupId de um publisher conhecido (ex.: `org.springframework`), repositório de código vinculado, uso relevante, release nos últimos 12 meses. Desconfie de groupId/artifactId quase iguais aos de projetos famosos.
 3. **Versão fixa**: explícita, ou gerenciada pelo BOM do Spring Boot. Nada de `LATEST`, `RELEASE` ou faixas `[1.0,)`.
-4. **Sem vulnerabilidades conhecidas** depois de adicionar:
+4. **Sem vulnerabilidades conhecidas** na versão escolhida (GitHub Advisory Database; a lista precisa voltar vazia):
 
    ```bash
-   ./mvnw -B org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7
+   gh api -X GET advisories -f ecosystem=maven -f affects=<groupId>:<artifactId>@<version> --jq '.[] | .ghsa_id + " " + .severity'
    ```
+
+   Depois do merge, o Dependabot (`.github/dependabot.yml`) vigia as dependências e abre PRs de atualização e de segurança.
 
 5. Prefira os starters do Spring Boot (`spring-boot-starter-*`) a bibliotecas avulsas para a mesma função.
 6. Registre cada dependência nova na seção "Dependências novas" da spec. Se qualquer item acima falhar, não adicione: pare e pergunte ao humano.
@@ -70,7 +72,6 @@ Use o Maven Wrapper (`./mvnw` no Bash, `.\mvnw.cmd` no PowerShell):
 ./mvnw clean package                         # gera o jar em target/
 ./mvnw clean verify                          # testes + cobertura (JaCoCo, falha abaixo de 80% de linha ou branch)
 ./mvnw test-compile org.pitest:pitest-maven:mutationCoverage   # mutação (PIT, falha abaixo de 60%)
-./mvnw org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7 -DnvdApiKey=...   # CVEs (lento sem a chave do NVD)
 ```
 
 O banco está desligado temporariamente via `spring.autoconfigure.exclude` (dados em memória); os testes rodam sem PostgreSQL e sem chave da Anthropic (o `ChatModel` do Spring AI é mockado nos testes; nenhum teste chama a API real).

@@ -35,7 +35,6 @@
 		<jacoco.version>0.8.16</jacoco.version>
 		<pitest.version>1.30.2</pitest.version>
 		<pitest-junit5.version>1.2.3</pitest-junit5.version>
-		<dependency-check.version>13.0.0</dependency-check.version>
 		<sonar-maven-plugin.version>5.9.0.7382</sonar-maven-plugin.version>
 	</properties>
 	<dependencyManagement>
@@ -114,16 +113,11 @@
 	<build>
 		<pluginManagement>
 			<plugins>
-				<!-- Versões fixas dos plugins chamados direto pelo CI (sonar e OWASP). -->
+				<!-- Versão fixa do plugin chamado direto pelo CI. -->
 				<plugin>
 					<groupId>org.sonarsource.scanner.maven</groupId>
 					<artifactId>sonar-maven-plugin</artifactId>
 					<version>${sonar-maven-plugin.version}</version>
-				</plugin>
-				<plugin>
-					<groupId>org.owasp</groupId>
-					<artifactId>dependency-check-maven</artifactId>
-					<version>${dependency-check.version}</version>
 				</plugin>
 			</plugins>
 		</pluginManagement>
