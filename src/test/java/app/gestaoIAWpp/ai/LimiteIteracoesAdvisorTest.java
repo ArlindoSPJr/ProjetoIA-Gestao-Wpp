@@ -1,4 +1,7 @@
-package app.gestaoIAWpp.agente;
+package app.gestaoIAWpp.ai;
+
+import app.gestaoIAWpp.ai.dto.IteracaoTurnoResponse;
+import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -102,10 +105,10 @@ class LimiteIteracoesAdvisorTest {
         verify(chatModel, times(5)).call(any(Prompt.class));
         assertThat(tool.contador.get()).isEqualTo(4);
         assertThat(r.getResult().getMetadata().getFinishReason()).isEqualTo(LimiteIteracoesAdvisor.FINISH_LIMITE);
-        List<IteracaoTurno> it = registro.iteracoes();
+        List<IteracaoTurnoResponse> it = registro.iteracoes();
         assertThat(it).hasSize(5);
         assertThat(it.get(4).observacao()).contains("limite");
-        assertThat(it).allSatisfy(i -> assertThat(i.toolsPedidas()).extracting(ToolPedida::nome).containsExactly("contar"));
+        assertThat(it).allSatisfy(i -> assertThat(i.toolsPedidas()).extracting(ToolPedidaResponse::nome).containsExactly("contar"));
     }
 
     @Test

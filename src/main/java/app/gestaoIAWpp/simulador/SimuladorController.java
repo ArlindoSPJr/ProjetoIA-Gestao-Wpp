@@ -1,7 +1,7 @@
 package app.gestaoIAWpp.simulador;
 
-import app.gestaoIAWpp.agente.AgenteAtendimento;
-import app.gestaoIAWpp.agente.RespostaAgente;
+import app.gestaoIAWpp.ai.AgenteAtendimento;
+import app.gestaoIAWpp.ai.dto.AgenteResponse;
 import app.gestaoIAWpp.atendimento.AtendimentoService;
 import app.gestaoIAWpp.carrinho.CarrinhoService;
 import app.gestaoIAWpp.produto.EstoqueService;
@@ -41,7 +41,7 @@ public class SimuladorController {
     }
 
     @PostMapping("/mensagens")
-    public RespostaAgente mensagem(@RequestBody MensagemRequest request) {
+    public AgenteResponse mensagem(@RequestBody MensagemRequest request) {
         return atendimento.processarMensagem(request.telefone(), request.texto());
     }
 

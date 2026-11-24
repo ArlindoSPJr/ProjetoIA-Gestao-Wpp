@@ -8,10 +8,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import app.gestaoIAWpp.agente.AgenteAtendimento;
-import app.gestaoIAWpp.agente.IteracaoTurno;
-import app.gestaoIAWpp.agente.RespostaAgente;
-import app.gestaoIAWpp.agente.ToolPedida;
+import app.gestaoIAWpp.ai.AgenteAtendimento;
+import app.gestaoIAWpp.ai.dto.IteracaoTurnoResponse;
+import app.gestaoIAWpp.ai.dto.AgenteResponse;
+import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
 import app.gestaoIAWpp.atendimento.AtendimentoService;
 import app.gestaoIAWpp.carrinho.CarrinhoResumo;
 import app.gestaoIAWpp.carrinho.CarrinhoService;
@@ -40,10 +40,10 @@ class SimuladorControllerTest {
 
     @Test
     void postMensagemRetornaTextoEIteracoes() throws Exception {
-        var iteracao = new IteracaoTurno(1, "tool_use", 10, 5,
-                List.of(new ToolPedida("consultar_produto", "{}")), null);
+        var iteracao = new IteracaoTurnoResponse(1, "tool_use", 10, 5,
+                List.of(new ToolPedidaResponse("consultar_produto", "{}")), null);
         when(atendimento.processarMensagem("5511", "oi"))
-                .thenReturn(new RespostaAgente("olá", List.of(iteracao)));
+                .thenReturn(new AgenteResponse("olá", List.of(iteracao)));
         mvc.perform(post("/api/simulador/mensagens").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"telefone\":\"5511\",\"texto\":\"oi\"}"))
                 .andExpect(status().isOk())

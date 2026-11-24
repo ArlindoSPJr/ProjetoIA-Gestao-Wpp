@@ -1,4 +1,7 @@
-package app.gestaoIAWpp.agente;
+package app.gestaoIAWpp.ai;
+
+import app.gestaoIAWpp.ai.dto.IteracaoTurnoResponse;
+import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,7 +14,7 @@ class RegistroTurnoTest {
     @Test
     void iteracoesNaOrdemComDadosDaResposta() {
         RegistroTurno registro = new RegistroTurno();
-        List<ToolPedida> tools = List.of(new ToolPedida("ver_carrinho", "{}"));
+        List<ToolPedidaResponse> tools = List.of(new ToolPedidaResponse("ver_carrinho", "{}"));
 
         assertThat(registro.iniciarIteracao()).isEqualTo(1);
         registro.concluirIteracao("tool_use", 10, 5, tools);
@@ -20,8 +23,8 @@ class RegistroTurnoTest {
 
         assertThat(registro.iteracoesIniciadas()).isEqualTo(2);
         assertThat(registro.iteracoes()).containsExactly(
-                new IteracaoTurno(1, "tool_use", 10, 5, tools, null),
-                new IteracaoTurno(2, "end_turn", 20, 8, List.of(), null));
+                new IteracaoTurnoResponse(1, "tool_use", 10, 5, tools, null),
+                new IteracaoTurnoResponse(2, "end_turn", 20, 8, List.of(), null));
     }
 
     @Test
@@ -33,7 +36,7 @@ class RegistroTurnoTest {
         registro.concluirIteracao("end_turn", 2, 2, List.of());
         registro.observar("limite atingido");
 
-        List<IteracaoTurno> iteracoes = registro.iteracoes();
+        List<IteracaoTurnoResponse> iteracoes = registro.iteracoes();
         assertThat(iteracoes.get(0).observacao()).isNull();
         assertThat(iteracoes.get(1).observacao()).isEqualTo("limite atingido");
         assertThat(iteracoes.get(1).finishReason()).isEqualTo("end_turn");
@@ -46,7 +49,7 @@ class RegistroTurnoTest {
         registro.observar("falha");
 
         assertThat(registro.iteracoes()).hasSize(1);
-        IteracaoTurno it = registro.iteracoes().get(0);
+        IteracaoTurnoResponse it = registro.iteracoes().get(0);
         assertThat(it.numero()).isEqualTo(1);
         assertThat(it.finishReason()).isNull();
         assertThat(it.observacao()).isEqualTo("falha");

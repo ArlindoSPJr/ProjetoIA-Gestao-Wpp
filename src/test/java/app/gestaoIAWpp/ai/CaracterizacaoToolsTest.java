@@ -1,6 +1,6 @@
-package app.gestaoIAWpp.agente;
+package app.gestaoIAWpp.ai;
 
-import static app.gestaoIAWpp.agente.FerramentasAgente.CHAVE_TELEFONE;
+import static app.gestaoIAWpp.ai.FerramentasAgente.CHAVE_TELEFONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

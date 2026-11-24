@@ -1,4 +1,6 @@
-package app.gestaoIAWpp.agente;
+package app.gestaoIAWpp.ai;
+
+import app.gestaoIAWpp.ai.dto.AgenteResponse;
 
 import com.anthropic.models.messages.OutputConfig;
 import java.io.IOException;
@@ -80,7 +82,7 @@ public class AgenteSpringAi implements AgenteAtendimento {
     }
 
     @Override
-    public RespostaAgente responder(String telefone, String mensagem) {
+    public AgenteResponse responder(String telefone, String mensagem) {
         Object lock = locks.computeIfAbsent(telefone, t -> new Object());
         synchronized (lock) {
             return executarTurno(telefone, mensagem);
@@ -95,7 +97,7 @@ public class AgenteSpringAi implements AgenteAtendimento {
         }
     }
 
-    private RespostaAgente executarTurno(String telefone, String mensagem) {
+    private AgenteResponse executarTurno(String telefone, String mensagem) {
         long geracaoDoTurno = geracao.get();
         List<Message> snapshot = List.copyOf(memoria.get(telefone));
         RegistroTurno registro = new RegistroTurno();
@@ -141,13 +143,13 @@ public class AgenteSpringAi implements AgenteAtendimento {
         if (geracao.get() != geracaoDoTurno) {
             memoria.clear(telefone);
         }
-        return new RespostaAgente(texto, registro.iteracoes());
+        return new AgenteResponse(texto, registro.iteracoes());
     }
 
-    private RespostaAgente fallback(String telefone, List<Message> snapshot, long geracaoDoTurno,
+    private AgenteResponse fallback(String telefone, List<Message> snapshot, long geracaoDoTurno,
                                     RegistroTurno registro) {
         restaurar(telefone, snapshot, geracaoDoTurno);
-        return new RespostaAgente(MENSAGEM_FALLBACK, registro.iteracoes());
+        return new AgenteResponse(MENSAGEM_FALLBACK, registro.iteracoes());
     }
 
     /** Volta a memória ao estado de antes do turno (ou só a limpa, se houve reset no meio). */

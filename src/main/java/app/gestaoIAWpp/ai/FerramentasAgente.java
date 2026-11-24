@@ -1,4 +1,4 @@
-package app.gestaoIAWpp.agente;
+package app.gestaoIAWpp.ai;
 
 import app.gestaoIAWpp.carrinho.CarrinhoResumo;
 import app.gestaoIAWpp.carrinho.CarrinhoService;

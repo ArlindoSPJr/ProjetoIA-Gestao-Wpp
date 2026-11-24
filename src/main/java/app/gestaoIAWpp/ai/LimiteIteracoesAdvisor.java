@@ -1,4 +1,6 @@
-package app.gestaoIAWpp.agente;
+package app.gestaoIAWpp.ai;
+
+import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,10 +54,10 @@ public class LimiteIteracoesAdvisor extends ToolCallingAdvisor {
             return base;
         }
 
-        List<ToolPedida> pedidas = new ArrayList<>();
+        List<ToolPedidaResponse> pedidas = new ArrayList<>();
         for (Generation g : chatResponse.getResults()) {
             for (AssistantMessage.ToolCall tc : g.getOutput().getToolCalls()) {
-                pedidas.add(new ToolPedida(tc.name(), tc.arguments()));
+                pedidas.add(new ToolPedidaResponse(tc.name(), tc.arguments()));
             }
         }
         String finish = chatResponse.getResult() == null

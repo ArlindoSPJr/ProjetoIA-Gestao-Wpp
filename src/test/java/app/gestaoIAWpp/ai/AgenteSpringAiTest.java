@@ -1,4 +1,8 @@
-package app.gestaoIAWpp.agente;
+package app.gestaoIAWpp.ai;
+
+import app.gestaoIAWpp.ai.dto.AgenteResponse;
+import app.gestaoIAWpp.ai.dto.IteracaoTurnoResponse;
+import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -134,14 +138,14 @@ class AgenteSpringAiTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(
                 comTool("t1", "consultar_produto", "{\"termo\":\"camisa preta\"}"), texto("Temos sim!"));
 
-        RespostaAgente r = agente.responder(TEL, "tem camisa preta?");
+        AgenteResponse r = agente.responder(TEL, "tem camisa preta?");
 
         assertThat(r.texto()).isEqualTo("Temos sim!");
         assertThat(r.iteracoes()).hasSize(2);
-        IteracaoTurno primeira = r.iteracoes().get(0);
+        IteracaoTurnoResponse primeira = r.iteracoes().get(0);
         assertThat(primeira.finishReason()).isEqualTo("tool_use");
         assertThat(primeira.toolsPedidas())
-                .containsExactly(new ToolPedida("consultar_produto", "{\"termo\":\"camisa preta\"}"));
+                .containsExactly(new ToolPedidaResponse("consultar_produto", "{\"termo\":\"camisa preta\"}"));
         assertThat(primeira.tokensEntrada()).isEqualTo(10);
         assertThat(primeira.tokensSaida()).isEqualTo(5);
         assertThat(r.iteracoes().get(1).finishReason()).isEqualTo("end_turn");
@@ -165,7 +169,7 @@ class AgenteSpringAiTest {
         when(chatModel.call(any(Prompt.class))).thenAnswer(
                 i -> comTool("t", "adicionar_ao_carrinho", "{\"produtoId\":\"P001\",\"quantidade\":1}"));
 
-        RespostaAgente r = agente.responder(TEL, "quero uma camisa");
+        AgenteResponse r = agente.responder(TEL, "quero uma camisa");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
         verify(chatModel, times(5)).call(any(Prompt.class));
@@ -181,10 +185,10 @@ class AgenteSpringAiTest {
         }
         when(chatModel.call(any(Prompt.class))).thenReturn(comTools(onze));
 
-        RespostaAgente r = agente.responder(TEL, "meu carrinho");
+        AgenteResponse r = agente.responder(TEL, "meu carrinho");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
-        assertThat(r.iteracoes()).last().extracting(IteracaoTurno::observacao).asString()
+        assertThat(r.iteracoes()).last().extracting(IteracaoTurnoResponse::observacao).asString()
                 .contains("limite de tools");
     }
 
@@ -230,7 +234,7 @@ class AgenteSpringAiTest {
                 comTool("t1", "adicionar_ao_carrinho", "{\"produtoId\":\"P001\",\"quantidade\":999}"),
                 texto("Não temos tudo isso."));
 
-        RespostaAgente r = agente.responder(TEL, "quero 999");
+        AgenteResponse r = agente.responder(TEL, "quero 999");
 
         assertThat(r.texto()).isEqualTo("Não temos tudo isso.");
         assertThat(toolResult(prompts(2).get(1)).getResponses().get(0).responseData())
@@ -243,7 +247,7 @@ class AgenteSpringAiTest {
                 comTool("t1", "adicionar_ao_carrinho", "{\"produtoId\":\"P001\",\"quantidade\":\"dois\"}"),
                 texto("Quantas unidades?"));
 
-        RespostaAgente r = agente.responder(TEL, "quero duas");
+        AgenteResponse r = agente.responder(TEL, "quero duas");
 
         assertThat(r.texto()).isEqualTo("Quantas unidades?");
         assertThat(estoque.consultar("P001")).isEqualTo(12);
@@ -257,7 +261,7 @@ class AgenteSpringAiTest {
                 .thenReturn(texto("tudo certo"));
 
         agente.responder(TEL, "oi");
-        RespostaAgente falha = agente.responder(TEL, "tudo bem?");
+        AgenteResponse falha = agente.responder(TEL, "tudo bem?");
         agente.responder(TEL, "e agora?");
 
         assertThat(falha.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
@@ -283,11 +287,11 @@ class AgenteSpringAiTest {
     void textoEmBrancoRetornaFallbackSemSujarMemoria() {
         when(chatModel.call(any(Prompt.class))).thenReturn(texto("   "), texto("olá"));
 
-        RespostaAgente r = agente.responder(TEL, "oi");
+        AgenteResponse r = agente.responder(TEL, "oi");
         agente.responder(TEL, "oi de novo");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
-        assertThat(r.iteracoes()).last().extracting(IteracaoTurno::observacao).asString().contains("sem texto");
+        assertThat(r.iteracoes()).last().extracting(IteracaoTurnoResponse::observacao).asString().contains("sem texto");
         assertThat(resumo(prompts(2).get(1))).containsExactly("user:oi de novo");
     }
 
@@ -374,11 +378,11 @@ class AgenteSpringAiTest {
                 texto("olá"), resposta(new AssistantMessage("resposta cortada"), "max_tokens"), texto("tudo certo"));
 
         agente.responder(TEL, "oi");
-        RespostaAgente r = agente.responder(TEL, "conta uma história");
+        AgenteResponse r = agente.responder(TEL, "conta uma história");
         agente.responder(TEL, "e agora?");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
-        assertThat(r.iteracoes()).last().extracting(IteracaoTurno::observacao).asString().contains("max_tokens");
+        assertThat(r.iteracoes()).last().extracting(IteracaoTurnoResponse::observacao).asString().contains("max_tokens");
         assertThat(resumo(prompts(3).get(2))).containsExactly("user:oi", "assistant:olá", "user:e agora?");
     }
 
@@ -387,10 +391,10 @@ class AgenteSpringAiTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(
                 comTools(verCarrinho(0, 4)), comTools(verCarrinho(4, 4)), comTools(verCarrinho(8, 3)));
 
-        RespostaAgente r = agente.responder(TEL, "meu carrinho");
+        AgenteResponse r = agente.responder(TEL, "meu carrinho");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
-        assertThat(r.iteracoes()).last().extracting(IteracaoTurno::observacao).asString()
+        assertThat(r.iteracoes()).last().extracting(IteracaoTurnoResponse::observacao).asString()
                 .contains("limite de tools");
         verify(chatModel, times(3)).call(any(Prompt.class));
 
