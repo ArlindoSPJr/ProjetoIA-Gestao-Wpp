@@ -1,4 +1,4 @@
-package app.gestaoIAWpp.agente;
+package app.gestaoIAWpp.ai;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;

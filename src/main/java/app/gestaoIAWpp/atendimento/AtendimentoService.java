@@ -1,7 +1,7 @@
 package app.gestaoIAWpp.atendimento;
 
-import app.gestaoIAWpp.agente.AgenteAtendimento;
-import app.gestaoIAWpp.agente.RespostaAgente;
+import app.gestaoIAWpp.ai.AgenteAtendimento;
+import app.gestaoIAWpp.ai.dto.AgenteResponse;
 import org.springframework.stereotype.Service;
 
 /** Valida a mensagem recebida e a repassa ao agente. Fica entre o canal (simulador/WhatsApp) e a IA. */
@@ -14,7 +14,7 @@ public class AtendimentoService {
         this.agente = agente;
     }
 
-    public RespostaAgente processarMensagem(String telefone, String texto) {
+    public AgenteResponse processarMensagem(String telefone, String texto) {
         if (telefone == null || telefone.isBlank() || texto == null || texto.isBlank()) {
             throw new IllegalArgumentException("Telefone e texto são obrigatórios.");
         }

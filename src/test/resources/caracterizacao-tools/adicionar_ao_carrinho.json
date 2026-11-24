@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"produtoId":{"type":"string","description":"Id do produto retornado por consultar_produto."},"quantidade":{"type":"integer","description":"Quantidade a adicionar, no mínimo 1."}},"required":["produtoId","quantidade"],"additionalProperties":false}

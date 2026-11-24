@@ -58,7 +58,7 @@ Descrição curta: "sistema que transforma conversas de WhatsApp em pedidos regi
 8. Após a venda, a conversa volta ao bot? Quem responde enquanto o pedido aguarda validação?
 9. Quando reservar estoque: ao adicionar ao carrinho, ao finalizar ou após o pagamento
 10. Cliente pode editar/cancelar pedido pelo bot após finalizar?
-11. Loop de consultas do cliente: sem limite / limite fixo / sem limite rígido com escalonamento para humano após N falhas + timeout de inatividade
+11. Loop de consultas do cliente: sem limite / limite fixo / sem limite rígido com escalonamento para humano após N falhas + timeout de inatividade (demo: 5 chamadas à API por turno + 10 tools como rede de segurança; escalonamento para humano fica para a etapa de handoff)
 
 ## Stack sugerida
 Spring Boot, Spring AI, PostgreSQL + pgvector, Redis (debounce/estado), RabbitMQ (opcional), WhatsApp Cloud API oficial (número de teste gratuito), React/Next.js no painel, WebSocket/SSE, Spring Security + JWT, Docker, ngrok, Langfuse (observabilidade de LLM). Evitar libs não oficiais de WhatsApp (Baileys, Evolution API) em produção: risco de banimento.
