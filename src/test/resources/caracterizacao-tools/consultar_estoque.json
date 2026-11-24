@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"produtoId":{"type":"string","description":"Id do produto retornado por consultar_produto."}},"required":["produtoId"],"additionalProperties":false}

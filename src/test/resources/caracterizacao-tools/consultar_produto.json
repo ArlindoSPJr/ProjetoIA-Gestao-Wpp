@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"termo":{"type":"string","description":"Palavras-chave do produto extraídas da mensagem do cliente. Ex.: 'camisa preta', 'tênis branco'."}},"required":["termo"],"additionalProperties":false}
