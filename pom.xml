@@ -109,6 +109,21 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	<build>
 		<pluginManagement>
@@ -125,6 +140,19 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<!-- Testes de integração (*IT, com PostgreSQL via Testcontainers) rodam no verify. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 			<!-- Cobertura: o relatório XML alimenta o Sonar; o check falha o verify abaixo do limite. -->
 			<plugin>
@@ -195,6 +223,9 @@
 					<excludedClasses>
 						<param>app.gestaoIAWpp.GestaoIaWppApplication</param>
 					</excludedClasses>
+					<excludedTestClasses>
+						<param>app.gestaoIAWpp.**.*IT</param>
+					</excludedTestClasses>
 					<mutationThreshold>${mutacao.minima}</mutationThreshold>
 					<timestampedReports>false</timestampedReports>
 					<outputFormats>
