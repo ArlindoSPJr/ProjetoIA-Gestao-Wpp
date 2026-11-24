@@ -4,8 +4,17 @@ spring:
   config:
     # Lê variáveis locais (ex.: ANTHROPIC_API_KEY) de um .env na raiz, se existir. O .env não vai para o git.
     import: optional:file:.env[.properties]
+  datasource:
+    # Supabase. Os valores vêm do .env (ver .env.example).
+    url: ${SUPABASE_DB_URL:}
+    username: ${SUPABASE_DB_USER:}
+    password: ${SUPABASE_DB_PASSWORD:}
+    hikari:
+      # O plano gratuito limita as conexões simultâneas.
+      maximum-pool-size: 5
   autoconfigure:
-    # Temporário: sem PostgreSQL nesta fase (dados em memória). Remover quando o banco entrar.
+    # Temporário: o datasource acima já está configurado, mas o banco só é ligado na etapa 1
+    # (junto com as migrations). Até lá, testes e demo rodam em memória.
     exclude:
       - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
       - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
