@@ -8,11 +8,55 @@ Projeto em fase inicial: uma demo do agente de atendimento está sendo construí
 
 É um projeto de estudos (o objetivo principal é aprender) e também portfólio para vaga júnior de backend Java. Prefira explicar o porquê das escolhas a só entregar código.
 
-## Fluxo de desenvolvimento
+## Fluxo de trabalho
 
-- Para qualquer feature, refatoração ou mudança de comportamento com mais de uma etapa, use a skill `orquestrador-dev`.
-- Bugs, testes falhando ou comportamento inesperado começam por `superpowers:systematic-debugging`.
-- Convenções específicas de cada projeto (arquitetura, nomes, comandos de build e teste) estão no [`CLAUDE.md`](http://CLAUDE.md) do projeto e têm prioridade.
+- Feature nova, bug ou mudança de comportamento: use a skill **spec-flow**.
+- Mudança trivial (texto, log, renomear): pode ir direto, mas os comandos da seção "Comandos" precisam passar.
+
+## Testes
+
+Siga `.claude/rules/testing.md`. Cobertura sobe cobrindo **caminhos diferentes** (partições, limites, branches, erros), nunca repetindo casos da mesma lógica.
+
+## Limites de qualidade (fonte de verdade: Quality Gate do Sonar)
+
+| Métrica | Limite | Onde é configurado |
+|---|---|---|
+| Issues novos | 0 | Sonar |
+| Cobertura no código novo (linha e branch) | ≥ 80% | JaCoCo (`jacoco:check` no pom.xml) + Sonar |
+| Duplicação no código novo | ≤ 3% | Sonar |
+| Complexidade cognitiva por método | ≤ 15 | Sonar (java:S3776) |
+| Complexidade ciclomática por método | ≤ 10 | Sonar (java:S1541) |
+| Mutation score | ≥ 60% | PIT (`mutationThreshold` no pom.xml) |
+
+## Dependências (validação obrigatória)
+
+Antes de declarar qualquer dependência no `pom.xml`, confirme que ela existe e é a certa. Nomes inventados por IA podem ter sido registrados por atacantes ("slopsquatting").
+
+1. **Existe no Maven Central** com `groupId:artifactId:version` exatos (falha se não existir):
+
+   ```bash
+   ./mvnw -B dependency:get -Dartifact=<groupId>:<artifactId>:<version> -Dtransitive=false
+   ```
+
+2. **É a dependência certa**: groupId de um publisher conhecido (ex.: `org.springframework`), repositório de código vinculado, uso relevante, release nos últimos 12 meses. Desconfie de groupId/artifactId quase iguais aos de projetos famosos.
+3. **Versão fixa**: explícita, ou gerenciada pelo BOM do Spring Boot. Nada de `LATEST`, `RELEASE` ou faixas `[1.0,)`.
+4. **Sem vulnerabilidades conhecidas** depois de adicionar:
+
+   ```bash
+   ./mvnw -B org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7
+   ```
+
+5. Prefira os starters do Spring Boot (`spring-boot-starter-*`) a bibliotecas avulsas para a mesma função.
+6. Registre cada dependência nova na seção "Dependências novas" da spec. Se qualquer item acima falhar, não adicione: pare e pergunte ao humano.
+
+## Proibições
+
+- Não baixar limites de cobertura, mutação ou Quality Gate, nem editar a configuração do Sonar, do JaCoCo ou do PIT (incluindo `excludes`).
+- Não usar `// NOSONAR`, `@SuppressWarnings`, `@Disabled`, `@Ignore`, `assumeTrue(false)` ou `-DskipTests` para passar em checagem.
+- Não apagar nem enfraquecer testes existentes. Se um teste parece errado, pare e pergunte.
+- Não adicionar dependências fora da spec ou do plano.
+- Não fazer merge, force push na branch principal ou alteração de segredos (`application-*.yml` com credenciais, variáveis de ambiente).
+- Não alterar uma spec aprovada (`docs/specs/`). Divergência = perguntar ao humano.
 
 ## Comandos
 
