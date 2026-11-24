@@ -74,6 +74,15 @@
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-anthropic</artifactId>
+			<exclusions>
+				<!-- O okio 3.6.0 (via okhttp) puxa o kotlin-stdlib-common 1.9.10, com CVE-2026-53914 (CVSS 9.8).
+				     Desde o Kotlin 1.9.20 esse conteúdo está dentro do kotlin-stdlib (aqui 2.4.21), e o
+				     kotlin-stdlib-common 2.x nem publica jar; o artefato antigo é só redundante. -->
+				<exclusion>
+					<groupId>org.jetbrains.kotlin</groupId>
+					<artifactId>kotlin-stdlib-common</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>
