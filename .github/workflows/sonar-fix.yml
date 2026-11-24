@@ -1,0 +1,102 @@
+name: Sonar-fix
+
+# Atenção: workflows disparados por workflow_run só rodam se este arquivo estiver na branch principal.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: sonar-fix-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    # Só PRs do próprio repositório (fork não recebe secrets e não deve disparar um agente com permissão de escrita).
+    if: >
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Um PAT (ou token de GitHub App) é obrigatório: pushes feitos com o GITHUB_TOKEN padrão
+      # NÃO disparam novos workflows, e o CI não rodaria de novo depois da correção.
+      GH_TOKEN: ${{ secrets.FIX_PUSH_TOKEN }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+    steps:
+      - name: Identificar o PR, o que falhou e as tentativas já usadas
+        id: ctx
+        run: |
+          set -euo pipefail
+          PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            echo "Nenhum PR aberto para a branch."; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          SONAR_STEP=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs \
+            --jq '[.jobs[].steps[] | select(.name=="Sonar analysis and Quality Gate") | .conclusion] | first // empty')
+          if [ "$SONAR_STEP" != "failure" ]; then
+            echo "A falha não foi no Quality Gate do Sonar (build, teste, mutação ou dependência). Nada a fazer aqui."
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          ATTEMPTS=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/commits" --paginate --jq '.[].commit.message' | grep -c '^fix(sonar):' || true)
+          if [ "$ATTEMPTS" -ge 3 ]; then
+            gh label create needs-human --color B60205 --description "Agente esgotou as tentativas" --force
+            gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --add-label needs-human
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "O agente sonar-fix usou as 3 tentativas e o Quality Gate ainda reprova. Precisa de revisão humana."
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+          echo "attempts=$ATTEMPTS" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.ctx.outputs.skip == 'false'
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+          token: ${{ secrets.FIX_PUSH_TOKEN }}
+
+      - uses: actions/setup-java@v4
+        if: steps.ctx.outputs.skip == 'false'
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Configurar identidade do git
+        if: steps.ctx.outputs.skip == 'false'
+        run: |
+          git config user.name "sonar-fix[bot]"
+          git config user.email "sonar-fix@users.noreply.github.com"
+
+      - name: Rodar o agente sonar-fix
+        if: steps.ctx.outputs.skip == 'false'
+        # Fixada pelo SHA (Sonar githubactions:S7637): uma tag pode ser movida para outro código.
+        uses: anthropics/claude-code-action@eb56b6666facdbd501035f4a0269d8caee2e7a8b # v1.0.289
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+          PR_NUMBER: ${{ steps.ctx.outputs.pr }}
+        with:
+          # Token da assinatura Pro/Max (gerado com `claude setup-token`): consome os limites do plano, não créditos da API.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.FIX_PUSH_TOKEN }}
+          prompt: |
+            Use o subagente sonar-fix para corrigir o Quality Gate do SonarQube do PR #${{ steps.ctx.outputs.pr }}.
+            Tentativas já usadas: ${{ steps.ctx.outputs.attempts }} de 3.
+            Variáveis disponíveis no ambiente: SONAR_TOKEN, SONAR_HOST_URL, SONAR_PROJECT_KEY, PR_NUMBER.
+          claude_args: >-
+            --max-turns 40
+            --allowedTools "Read,Grep,Glob,Edit,Write,Bash(./mvnw:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD:*),Bash(gh pr comment:*),Bash(gh pr edit:*),Bash(curl -sS --oauth2-bearer $SONAR_TOKEN $SONAR_HOST_URL/api/:*)"
+            --disallowedTools "Bash(git push --force:*),Bash(git push -f:*),Bash(git push origin main:*)"
