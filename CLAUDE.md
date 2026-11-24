@@ -68,6 +68,9 @@ Use o Maven Wrapper (`./mvnw` no Bash, `.\mvnw.cmd` no PowerShell):
 ./mvnw test -Dtest=NomeDaClasseTest          # uma classe de teste
 ./mvnw test -Dtest=NomeDaClasseTest#metodo   # um método de teste
 ./mvnw clean package                         # gera o jar em target/
+./mvnw clean verify                          # testes + cobertura (JaCoCo, falha abaixo de 80% de linha ou branch)
+./mvnw test-compile org.pitest:pitest-maven:mutationCoverage   # mutação (PIT, falha abaixo de 60%)
+./mvnw org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7 -DnvdApiKey=...   # CVEs (lento sem a chave do NVD)
 ```
 
 O banco está desligado temporariamente via `spring.autoconfigure.exclude` (dados em memória); os testes rodam sem PostgreSQL e sem chave da Anthropic (o `ChatModel` do Spring AI é mockado nos testes; nenhum teste chama a API real).
