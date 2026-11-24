@@ -98,7 +98,7 @@ class SimuladorControllerTest {
     }
 
     @Test
-    @DisplayName("CA17 estado lista as variantes da empresa com o nome completo e o carrinho do cliente")
+    @DisplayName("T27 CA17 estado lista as variantes da empresa com o nome completo e o carrinho do cliente")
     void getEstadoRetornaCarrinhoEEstoque() throws Exception {
         UUID empresa = UUID.randomUUID();
         UUID clienteId = UUID.randomUUID();
@@ -114,6 +114,9 @@ class SimuladorControllerTest {
         mvc.perform(get("/api/simulador/estado").param("telefone", "5511999990000"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.carrinho.total").value(99.80))
+                .andExpect(jsonPath("$.carrinho.itens[0].nome").value("Camisa Básica (Preta / M)"))
+                .andExpect(jsonPath("$.carrinho.itens[0].precoUnitario").value(49.90))
+                .andExpect(jsonPath("$.carrinho.itens[0].quantidade").value(2))
                 .andExpect(jsonPath("$.carrinho.itens[0].subtotal").value(99.80))
                 .andExpect(jsonPath("$.estoque.length()").value(1))
                 .andExpect(jsonPath("$.estoque[0].varianteId").value(varianteId.toString()))
@@ -145,6 +148,7 @@ class SimuladorControllerTest {
     }
 
     @Test
+    @DisplayName("T27 reset limpa as conversas, reinicia os carrinhos da empresa da demo e devolve 204")
     void resetReiniciaConversasECarrinhosDaEmpresaERetorna204() throws Exception {
         UUID empresa = UUID.randomUUID();
         when(atendimento.empresaDoNumero("simulador-loja-demo")).thenReturn(empresa);

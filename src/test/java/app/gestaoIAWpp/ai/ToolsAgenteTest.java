@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import app.gestaoIAWpp.carrinho.CarrinhoService;
+import app.gestaoIAWpp.carrinho.CarrinhoTeste;
 import app.gestaoIAWpp.carrinho.CarrinhoTool;
 import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.ProdutoService;
@@ -42,7 +43,7 @@ class ToolsAgenteTest {
     void setUp() {
         var catalogo = CatalogoTeste.lojaDemo(EMPRESA);
         variantes = catalogo.varianteRepository();
-        carrinho = new CarrinhoService(variantes);
+        carrinho = new CarrinhoService(variantes, CarrinhoTeste.repositorio(variantes));
         carrinhoTool = new CarrinhoTool(carrinho);
         registry = new ToolRegistry(List.of(
                 new ProdutoTool(new ProdutoService(catalogo.produtoRepository(), variantes)), carrinhoTool));

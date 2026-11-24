@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import app.gestaoIAWpp.carrinho.CarrinhoService;
+import app.gestaoIAWpp.carrinho.CarrinhoTeste;
 import app.gestaoIAWpp.carrinho.CarrinhoTool;
 import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.ProdutoService;
@@ -45,7 +46,7 @@ class CaracterizacaoToolsTest {
         catalogo = CatalogoTeste.lojaDemo(EMPRESA);
         var variantes = catalogo.varianteRepository();
         var produtoService = new ProdutoService(catalogo.produtoRepository(), variantes);
-        var carrinho = new CarrinhoService(variantes);
+        var carrinho = new CarrinhoService(variantes, CarrinhoTeste.repositorio(variantes));
         registry = new ToolRegistry(List.of(new ProdutoTool(produtoService), new CarrinhoTool(carrinho)));
         ctx = new ToolContext(Map.of(CHAVE_EMPRESA_ID, EMPRESA, CHAVE_CLIENTE_ID, CLIENTE));
         pretaM = id("Camisa Básica (Preta / M)");

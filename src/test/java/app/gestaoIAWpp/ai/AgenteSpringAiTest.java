@@ -15,6 +15,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import app.gestaoIAWpp.carrinho.CarrinhoService;
+import app.gestaoIAWpp.carrinho.CarrinhoTeste;
 import app.gestaoIAWpp.carrinho.CarrinhoTool;
 import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.ProdutoService;
@@ -64,7 +65,7 @@ class AgenteSpringAiTest {
         var catalogo = CatalogoTeste.lojaDemo(EMPRESA);
         variantes = catalogo.varianteRepository();
         pretaM = catalogo.variante("Camisa Básica (Preta / M)").getId().toString();
-        var carrinho = new CarrinhoService(variantes);
+        var carrinho = new CarrinhoService(variantes, CarrinhoTeste.repositorio(variantes));
         var tools = new ToolRegistry(List.of(new ProdutoTool(new ProdutoService(catalogo.produtoRepository(), variantes)),
                 new CarrinhoTool(carrinho)));
         agente = new AgenteSpringAi(ChatClient.builder(chatModel),

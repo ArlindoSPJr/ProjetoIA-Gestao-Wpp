@@ -66,15 +66,17 @@ Use o Maven Wrapper (`./mvnw` no Bash, `.\mvnw.cmd` no PowerShell):
 
 ```bash
 ./mvnw spring-boot:run                       # sobe a aplicação
-./mvnw test                                  # roda todos os testes
+./mvnw test                                  # testes unitários (*Test), sem banco e sem Docker
 ./mvnw test -Dtest=NomeDaClasseTest          # uma classe de teste
 ./mvnw test -Dtest=NomeDaClasseTest#metodo   # um método de teste
 ./mvnw clean package                         # gera o jar em target/
-./mvnw clean verify                          # testes + cobertura (JaCoCo, falha abaixo de 80% de linha ou branch)
+./mvnw clean verify                          # unitários + integração (*IT, Testcontainers, precisa do Docker) + cobertura (JaCoCo, falha abaixo de 80% de linha ou branch)
 ./mvnw test-compile org.pitest:pitest-maven:mutationCoverage   # mutação (PIT, falha abaixo de 60%)
 ```
 
-O banco está desligado temporariamente via `spring.autoconfigure.exclude` (dados em memória); os testes rodam sem PostgreSQL e sem chave da Anthropic (o `ChatModel` do Spring AI é mockado nos testes; nenhum teste chama a API real).
+O banco está ligado: PostgreSQL no Supabase, com URL, usuário e senha lidos do `.env` (`SUPABASE_DB_URL`, `SUPABASE_DB_USER`, `SUPABASE_DB_PASSWORD`; ver `.env.example`). O Flyway aplica o schema de `src/main/resources/db/migration` e o seed da Loja Demo de `src/main/resources/db/demo` (as duas locations estão em `spring.flyway.locations`; tirar o seed de produção = remover a location `db/demo`). O Hibernate só valida o schema (`ddl-auto: validate`).
+
+Testes: `./mvnw test` roda só os `*Test` (unitários, repositórios mockados, sem PostgreSQL e sem Docker). Os que precisam de banco terminam em `IT` e rodam no `./mvnw verify` (Failsafe), com `postgres:17` via Testcontainers (`TestcontainersConfiguration`), então o Docker precisa estar rodando. Nenhum teste usa chave da Anthropic (o `ChatModel` do Spring AI é mockado; nenhum teste chama a API real).
 
 Demo do simulador (precisa de `ANTHROPIC_API_KEY`): copie `.env.example` para `.env` (ignorado pelo git) e preencha a chave, ou exporte a variável de ambiente. O Spring importa o `.env` via `spring.config.import` e `spring.ai.anthropic.api-key` lê `ANTHROPIC_API_KEY`.
 
@@ -94,19 +96,24 @@ Plano da demo: `docs/superpowers/plans/2026-11-20-demo-agente-atendimento.md` (s
 
 ## Estrutura da demo (pacotes sob `app.gestaoIAWpp`)
 
-- `produto/`: `CatalogoMock` (8 produtos e estoque inicial em memória), `ProdutoRepository` + `ProdutoRepositoryEmMemoria` (busca por pontuação, tolerante a acento e pontuação), `ProdutoService` (busca e disponibilidade; a regra de negócio dos produtos mora aqui, não nas tools), `EstoqueService` (baixa/devolução atômicas); `ProdutoTool` (as tools `consultar_produto` e `consultar_estoque`, só adaptador do `ProdutoService`).
-- `carrinho/`: `CarrinhoService`, um carrinho por telefone; adicionar baixa o estoque, remover devolve; `CarrinhoTool` (as tools do carrinho, só adaptador do `CarrinhoService`).
-- `ai/`: `AgenteAtendimento` (a porta da IA); `AgenteSpringAi` (monta o `ChatClient` com os advisors e roda o turno: memória por telefone, snapshot/restauração em caso de falha, fallback); `LimiteIteracoesAdvisor` (o `ToolCallingAdvisor` com teto de chamadas à API); `RegistroTurno` (iterações do turno); `ToolRegistry` (junta os `AgentTool` na ordem do `@Order`); `AgentTool` (interface marcadora das tools); `ContextoTool` (lê o telefone do `ToolContext`); `dto/` (os `*Response`). Para criar uma tool: um `@Component` num pacote de domínio que implementa `AgentTool`, com `@Order`; prompt em `src/main/resources/prompts/sistema-atendimento.txt`. A memória de conversa de um telefone fica no `ChatMemory` compartilhado durante o turno; qualquer código futuro que limpe a memória de um telefone (handoff, `ENCERRADA`, expiração) precisa segurar o lock desse telefone (como o `responder` faz). O reset do simulador hoje não segura, o que é aceito na demo.
-- `atendimento/`: `AtendimentoService.processarMensagem(telefone, texto)`, entrada agnóstica de canal (o futuro webhook do WhatsApp chama o mesmo serviço).
-- `simulador/`: endpoints REST `/api/simulador/*` e a página `src/main/resources/static/index.html`.
+Cada classe fica no pacote do seu domínio (sem pacotes técnicos como `entity/` ou `service/`); testes no pacote espelho.
 
-Regra das camadas: as tools só delegam ao domínio (`ProdutoService`, `CarrinhoService`); nenhuma regra de negócio fica em `ProdutoTool`/`CarrinhoTool`. O telefone vem do `ToolContext` via `ContextoTool` (preenchido pelo `AgenteSpringAi`), nunca do modelo: o modelo só informa ids, termo e quantidade.
+- `empresa/`: `NumeroWhatsapp` + `NumeroWhatsappRepository` (o número de atendimento, `phone_number_id`, aponta para a empresa) e `NumeroNaoCadastradoException`.
+- `cliente/`: `Cliente`, `ClienteRepository` e `ClienteService` (identifica o cliente por empresa e `user_id`, criando-o com `INSERT ... ON CONFLICT DO NOTHING`).
+- `produto/`: entidades do catálogo (`Produto`, `Opcao`, `ValorOpcao`, `Variante`: o que se vende é a variante, com preço e estoque próprios), `ProdutoRepository`, `VarianteRepository` (`daEmpresa`, e `baixarEstoque`/`devolverEstoque` como `UPDATE` nativo atômico), `ProdutoService` (busca por pontuação tolerante a acento e disponibilidade; a regra de negócio dos produtos mora aqui, não nas tools), exceções, records de domínio e `ProdutoTool` (as tools `consultar_produto` e `consultar_estoque`, só adaptador do `ProdutoService`); `dto/` com as respostas das tools.
+- `carrinho/`: `Carrinho`, `ItemCarrinho`, `StatusCarrinho`, `CarrinhoRepository` (criação do carrinho `ABERTO` e upsert do item em SQL nativo com `ON CONFLICT`) e `CarrinhoService`: carrinho persistido no banco, no máximo um `ABERTO` por cliente; adicionar baixa o estoque e grava o item na mesma transação, remover devolve, o resumo usa o preço atual da variante e o reset da demo devolve o estoque e apaga os carrinhos abertos da empresa. `CarrinhoTool` (as tools do carrinho, só adaptador do `CarrinhoService`); `dto/` com as respostas das tools. As queries nativas de escrita limpam o contexto de persistência (`clearAutomatically`): leia de novo o que precisar depois delas.
+- `ai/`: `AgenteAtendimento` (a porta da IA); `AgenteSpringAi` (monta o `ChatClient` com os advisors e roda o turno: memória por cliente, snapshot/restauração em caso de falha, fallback); `LimiteIteracoesAdvisor` (o `ToolCallingAdvisor` com teto de chamadas à API); `RegistroTurno` (iterações do turno); `ToolRegistry` (junta os `AgentTool` na ordem do `@Order`); `AgentTool` (interface marcadora das tools); `ContextoTool` (lê `empresaId` e `clienteId` do `ToolContext`); `dto/` (os `*Response`). Para criar uma tool: um `@Component` num pacote de domínio que implementa `AgentTool`, com `@Order`; prompt em `src/main/resources/prompts/sistema-atendimento.txt`. A memória de conversa de um cliente fica no `ChatMemory` compartilhado durante o turno; qualquer código futuro que limpe a memória de um cliente (handoff, `ENCERRADA`, expiração) precisa segurar o lock desse cliente (como o `responder` faz). O reset do simulador hoje não segura, o que é aceito na demo.
+- `atendimento/`: `AtendimentoService.processarMensagem(phoneNumberId, userId, telefone, texto)`, entrada agnóstica de canal (o futuro webhook do WhatsApp chama o mesmo serviço): resolve número → empresa → cliente e chama o agente com `empresaId` e `clienteId`.
+- `simulador/`: endpoints REST `/api/simulador/*` (`/mensagens`, `/estado` com o carrinho e as variantes, `/reset`) e a página `src/main/resources/static/index.html`. Usa o número `simulador.phone-number-id` do seed e `user_id = "BR.SIM" + telefone só com dígitos`.
+
+Regra das camadas: as tools só delegam ao domínio (`ProdutoService`, `CarrinhoService`); nenhuma regra de negócio fica em `ProdutoTool`/`CarrinhoTool`. `empresaId` e `clienteId` vêm do `ToolContext` via `ContextoTool` (preenchido pelo `AgenteSpringAi`), nunca do modelo: o modelo só informa `varianteId`, termo e quantidade.
 
 ## Stack
 
 - Java 21, Spring Boot 4.2.0 (starters separados no estilo do Boot 4: `spring-boot-starter-webmvc`, `spring-boot-starter-flyway` e os `*-test` correspondentes)
-- Spring AI 2.1 (`spring-ai-starter-model-anthropic`): tools com `@Tool`, loop de tool calling pelo `ToolCallingAdvisor` (aqui estendido pelo `LimiteIteracoesAdvisor`) e histórico por telefone com `MessageChatMemoryAdvisor`. pgvector e o advisor de RAG ficam para a etapa de RAG.
-- PostgreSQL + Flyway para o schema. As migrations vão em `src/main/resources/db/migration`.
+- Spring AI 2.1 (`spring-ai-starter-model-anthropic`): tools com `@Tool`, loop de tool calling pelo `ToolCallingAdvisor` (aqui estendido pelo `LimiteIteracoesAdvisor`) e histórico por cliente com `MessageChatMemoryAdvisor`. pgvector e o advisor de RAG ficam para a etapa de RAG.
+- PostgreSQL (Supabase) + Spring Data JPA (Hibernate) + Flyway para o schema. As migrations vão em `src/main/resources/db/migration`; dados da demo em `src/main/resources/db/demo`.
+- Testes de integração com Testcontainers (`postgres:17`), via `maven-failsafe-plugin`.
 - Pacote base: `app.gestaoIAWpp`
 
 ## Arquitetura pretendida (de `docs/contexto.md`)

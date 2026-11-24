@@ -5,94 +5,120 @@ import app.gestaoIAWpp.produto.Variante;
 import app.gestaoIAWpp.produto.VarianteNaoEncontradaException;
 import app.gestaoIAWpp.produto.VarianteRepository;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Carrinhos ainda em memória, um por cliente, com o estoque já no banco (baixa e devolução atômicas
- * pelo {@link VarianteRepository}). A assinatura é a final; a Task 5 leva o carrinho para o banco.
- * Os métodos são synchronized para manter carrinho e estoque coerentes.
+ * Carrinho no banco, um ABERTO por cliente. Cada operação que escreve roda numa única transação:
+ * estoque e carrinho mudam juntos ou nada muda (RN02).
+ *
+ * <p>As queries nativas de escrita ({@code baixarEstoque}, {@code devolverEstoque}, {@code somarItem})
+ * limpam o contexto de persistência ao terminar. Por isso o resumo é sempre montado com o carrinho
+ * lido de novo depois delas: entidades carregadas antes ficam destacadas e com estoque antigo.
  */
 @Service
 public class CarrinhoService {
 
     private static final String QUANTIDADE_INVALIDA = "Quantidade deve ser maior que zero.";
+    private static final CarrinhoResumo VAZIO = new CarrinhoResumo(List.of(), BigDecimal.ZERO.setScale(2));
 
     private final VarianteRepository variantes;
-    private final Map<UUID, LinkedHashMap<UUID, ItemCarrinhoResumo>> carrinhos = new HashMap<>();
+    private final CarrinhoRepository carrinhos;
 
-    public CarrinhoService(VarianteRepository variantes) {
+    public CarrinhoService(VarianteRepository variantes, CarrinhoRepository carrinhos) {
         this.variantes = variantes;
+        this.carrinhos = carrinhos;
     }
 
-    public synchronized CarrinhoResumo adicionar(UUID empresaId, UUID clienteId, UUID varianteId, int quantidade) {
+    @Transactional
+    public CarrinhoResumo adicionar(UUID empresaId, UUID clienteId, UUID varianteId, int quantidade) {
         if (quantidade < 1) {
             throw new IllegalArgumentException(QUANTIDADE_INVALIDA);
         }
         Variante variante = variantes.daEmpresa(varianteId, empresaId)
                 .orElseThrow(() -> new VarianteNaoEncontradaException(varianteId.toString()));
+        String nome = variante.nomeCompleto();
         if (variantes.baixarEstoque(varianteId, quantidade) == 0) {
             int disponivel = variantes.findById(varianteId).map(Variante::getQuantidadeEstoque).orElse(0);
-            throw new EstoqueInsuficienteException(varianteId, variante.nomeCompleto(), quantidade, disponivel);
+            throw new EstoqueInsuficienteException(varianteId, nome, quantidade, disponivel);
         }
-        var itens = carrinhos.computeIfAbsent(clienteId, c -> new LinkedHashMap<>());
-        itens.merge(
-                varianteId,
-                new ItemCarrinhoResumo(varianteId, variante.nomeCompleto(), variante.getPreco(), quantidade),
-                (atual, novo) -> new ItemCarrinhoResumo(
-                        atual.varianteId(), atual.nome(), atual.precoUnitario(), atual.quantidade() + quantidade));
-        return resumir(itens);
+        carrinhos.criarAbertoSeNaoExiste(empresaId, clienteId);
+        Carrinho carrinho = carrinhoAberto(empresaId, clienteId).orElseThrow();
+        carrinhos.somarItem(carrinho.getId(), varianteId, quantidade);
+        return resumoDoAberto(empresaId, clienteId);
     }
 
-    /** Sem quantidade (ou com mais do que há no carrinho), remove todas as unidades da variante. */
-    public synchronized CarrinhoResumo remover(UUID empresaId, UUID clienteId, UUID varianteId, Integer quantidade) {
+    /** RN03: sem quantidade, ou com quantidade maior ou igual à do item, remove o item inteiro. */
+    @Transactional
+    public CarrinhoResumo remover(UUID empresaId, UUID clienteId, UUID varianteId, Integer quantidade) {
         if (quantidade != null && quantidade < 1) {
             throw new IllegalArgumentException(QUANTIDADE_INVALIDA);
         }
-        var itens = carrinhos.getOrDefault(clienteId, new LinkedHashMap<>());
-        ItemCarrinhoResumo item = itens.get(varianteId);
-        if (item == null) {
-            throw new ItemNaoEstaNoCarrinhoException(varianteId);
-        }
-        int removida = (quantidade == null || quantidade >= item.quantidade()) ? item.quantidade() : quantidade;
-        variantes.devolverEstoque(varianteId, removida);
-        if (removida == item.quantidade()) {
-            itens.remove(varianteId);
+        Carrinho carrinho = carrinhoAberto(empresaId, clienteId)
+                .orElseThrow(() -> new ItemNaoEstaNoCarrinhoException(varianteId));
+        ItemCarrinho item = carrinho.item(varianteId)
+                .orElseThrow(() -> new ItemNaoEstaNoCarrinhoException(varianteId));
+        int removida = (quantidade == null || quantidade >= item.getQuantidade()) ? item.getQuantidade() : quantidade;
+        if (removida == item.getQuantidade()) {
+            carrinho.tirar(item);
         } else {
-            itens.put(varianteId, new ItemCarrinhoResumo(
-                    item.varianteId(), item.nome(), item.precoUnitario(), item.quantidade() - removida));
+            item.diminuir(removida);
         }
-        return resumir(itens);
+        // flushAutomatically grava a mudança do item antes do UPDATE do estoque; depois o contexto é limpo.
+        variantes.devolverEstoque(varianteId, removida);
+        return resumoDoAberto(empresaId, clienteId);
     }
 
-    public synchronized CarrinhoResumo ver(UUID clienteId) {
-        return resumir(carrinhos.getOrDefault(clienteId, new LinkedHashMap<>()));
+    @Transactional(readOnly = true)
+    public CarrinhoResumo ver(UUID clienteId) {
+        return carrinhos.findByClienteIdAndStatus(clienteId, StatusCarrinho.ABERTO)
+                .map(CarrinhoService::resumir)
+                .orElse(VAZIO);
     }
 
     /**
-     * Reset da demo: devolve ao estoque as unidades de todos os carrinhos e esvazia-os, na mesma seção
-     * crítica para um adicionar não cair no meio. O mapa em memória não guarda a empresa, então todos os
-     * carrinhos são reiniciados; a Task 5 restringe à empresa.
+     * RN14: devolve ao estoque os itens dos carrinhos ABERTO da empresa e apaga esses carrinhos (os
+     * itens vão junto pelo ON DELETE CASCADE). As devoluções são lidas antes do primeiro UPDATE, que
+     * destaca as entidades e impediria carregar os itens ainda não lidos.
      */
-    public synchronized void reiniciarDemo(UUID empresaId) {
-        for (var itens : carrinhos.values()) {
-            for (ItemCarrinhoResumo item : itens.values()) {
-                variantes.devolverEstoque(item.varianteId(), item.quantidade());
-            }
-        }
-        carrinhos.clear();
+    @Transactional
+    public void reiniciarDemo(UUID empresaId) {
+        List<Carrinho> abertos = carrinhos.findByEmpresaIdAndStatus(empresaId, StatusCarrinho.ABERTO);
+        List<Devolucao> devolucoes = abertos.stream()
+                .flatMap(c -> c.getItens().stream())
+                .map(i -> new Devolucao(i.getVariante().getId(), i.getQuantidade()))
+                .toList();
+        List<UUID> ids = abertos.stream().map(Carrinho::getId).toList();
+        devolucoes.forEach(d -> variantes.devolverEstoque(d.varianteId(), d.quantidade()));
+        carrinhos.deleteAllByIdInBatch(ids);
     }
 
-    private CarrinhoResumo resumir(Map<UUID, ItemCarrinhoResumo> itens) {
-        var lista = new ArrayList<>(itens.values());
-        BigDecimal total = lista.stream()
+    /** O carrinho ABERTO do cliente, só se for da empresa informada. */
+    private Optional<Carrinho> carrinhoAberto(UUID empresaId, UUID clienteId) {
+        return carrinhos.findByClienteIdAndStatus(clienteId, StatusCarrinho.ABERTO)
+                .filter(c -> c.getEmpresaId().equals(empresaId));
+    }
+
+    private CarrinhoResumo resumoDoAberto(UUID empresaId, UUID clienteId) {
+        return carrinhoAberto(empresaId, clienteId).map(CarrinhoService::resumir).orElse(VAZIO);
+    }
+
+    /** RN08: preço atual da variante, lido agora; o item não guarda preço. */
+    private static CarrinhoResumo resumir(Carrinho carrinho) {
+        List<ItemCarrinhoResumo> itens = carrinho.getItens().stream()
+                .map(i -> new ItemCarrinhoResumo(i.getVariante().getId(), i.getVariante().nomeCompleto(),
+                        i.getVariante().getPreco(), i.getQuantidade()))
+                .toList();
+        BigDecimal total = itens.stream()
                 .map(ItemCarrinhoResumo::subtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2);
-        return new CarrinhoResumo(lista, total);
+        return new CarrinhoResumo(itens, total);
+    }
+
+    private record Devolucao(UUID varianteId, int quantidade) {
     }
 }
