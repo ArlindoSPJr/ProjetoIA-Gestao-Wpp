@@ -1,4 +1,4 @@
-package app.gestaoIAWpp.ai.dto;
+package app.gestaoIAWpp.produto.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;

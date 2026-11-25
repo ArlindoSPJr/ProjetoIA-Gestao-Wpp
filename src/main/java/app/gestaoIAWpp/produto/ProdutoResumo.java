@@ -1,8 +1,8 @@
 package app.gestaoIAWpp.produto;
 
-import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 
-/** Produto como aparece numa busca: dados do catálogo mais a disponibilidade atual. */
-public record ProdutoResumo(String id, String nome, String descricao, BigDecimal preco,
-                            boolean emEstoque, int quantidadeDisponivel) {
+/** Produto como aparece numa busca, com todas as suas variantes ativas. */
+public record ProdutoResumo(UUID produtoId, String nome, String descricao, List<VarianteResumo> variantes) {
 }

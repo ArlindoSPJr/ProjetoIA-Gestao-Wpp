@@ -12,13 +12,13 @@ spring:
     hikari:
       # O plano gratuito limita as conexões simultâneas.
       maximum-pool-size: 5
-  autoconfigure:
-    # Temporário: o datasource acima já está configurado, mas o banco só é ligado na etapa 1
-    # (junto com as migrations). Até lá, testes e demo rodam em memória.
-    exclude:
-      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
-      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
-      - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    # db/demo traz o seed da Loja Demo (V2).
+    locations: classpath:db/migration, classpath:db/demo
   ai:
     anthropic:
       api-key: ${ANTHROPIC_API_KEY:}
@@ -26,6 +26,9 @@ spring:
       limits:
         # Rede de segurança. O limite principal é agente.max-iteracoes (chamadas à API por turno).
         max-total-tool-calls: 10
+
+simulador:
+  phone-number-id: simulador-loja-demo
 
 agente:
   modelo: claude-haiku-5-5

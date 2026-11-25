@@ -1,20 +1,22 @@
 package app.gestaoIAWpp.produto;
 
+import java.util.UUID;
+
 public class EstoqueInsuficienteException extends RuntimeException {
 
-    private final String produtoId;
+    private final UUID varianteId;
     private final int solicitado;
     private final int disponivel;
 
-    public EstoqueInsuficienteException(String produtoId, int solicitado, int disponivel) {
-        super("Estoque insuficiente para " + produtoId + ": solicitado " + solicitado + ", disponível " + disponivel + ".");
-        this.produtoId = produtoId;
+    public EstoqueInsuficienteException(UUID varianteId, String nome, int solicitado, int disponivel) {
+        super("Estoque insuficiente para " + nome + ": solicitado " + solicitado + ", disponível " + disponivel + ".");
+        this.varianteId = varianteId;
         this.solicitado = solicitado;
         this.disponivel = disponivel;
     }
 
-    public String getProdutoId() {
-        return produtoId;
+    public UUID getVarianteId() {
+        return varianteId;
     }
 
     public int getSolicitado() {

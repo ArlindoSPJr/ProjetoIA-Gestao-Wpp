@@ -6,22 +6,27 @@ import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import app.gestaoIAWpp.carrinho.CarrinhoService;
+import app.gestaoIAWpp.carrinho.CarrinhoTeste;
 import app.gestaoIAWpp.carrinho.CarrinhoTool;
-import app.gestaoIAWpp.produto.EstoqueService;
-import app.gestaoIAWpp.produto.ProdutoRepositoryEmMemoria;
+import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.ProdutoService;
 import app.gestaoIAWpp.produto.ProdutoTool;
+import app.gestaoIAWpp.produto.VarianteRepository;
 import com.anthropic.models.messages.OutputConfig;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
@@ -37,26 +42,32 @@ import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 
 class AgenteSpringAiTest {
 
-    private static final String TEL = "5511999990000";
+    private static final UUID EMPRESA = UUID.randomUUID();
+    private static final UUID CLIENTE = UUID.randomUUID();
 
     private ChatModel chatModel;
-    private EstoqueService estoque;
+    private VarianteRepository variantes;
+    private String pretaM;
     private AgenteSpringAi agente;
 
     @BeforeEach
     void preparar() {
         chatModel = mock(ChatModel.class);
         when(chatModel.getOptions()).thenReturn(AnthropicChatOptions.builder().build());
-        var produtos = new ProdutoRepositoryEmMemoria();
-        estoque = new EstoqueService();
-        var carrinho = new CarrinhoService(produtos, estoque);
-        var tools = new ToolRegistry(List.of(new ProdutoTool(new ProdutoService(produtos, estoque)), new CarrinhoTool(carrinho)));
+        var catalogo = CatalogoTeste.lojaDemo(EMPRESA);
+        variantes = catalogo.varianteRepository();
+        pretaM = catalogo.variante("Camisa Básica (Preta / M)").getId().toString();
+        var carrinho = new CarrinhoService(variantes, CarrinhoTeste.repositorio(variantes));
+        var tools = new ToolRegistry(List.of(new ProdutoTool(new ProdutoService(catalogo.produtoRepository(), variantes)),
+                new CarrinhoTool(carrinho)));
         agente = new AgenteSpringAi(ChatClient.builder(chatModel),
                 ToolCallingManager.builder().maxTotalToolCalls(10).build(), tools,
                 new AgenteProperties("claude-haiku-5-5", "low", 5));
@@ -140,7 +151,7 @@ class AgenteSpringAiTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(
                 comTool("t1", "consultar_produto", "{\"termo\":\"camisa preta\"}"), texto("Temos sim!"));
 
-        AgenteResponse r = agente.responder(TEL, "tem camisa preta?");
+        AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "tem camisa preta?");
 
         assertThat(r.texto()).isEqualTo("Temos sim!");
         assertThat(r.iteracoes()).hasSize(2);
@@ -158,24 +169,24 @@ class AgenteSpringAiTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(
                 comTool("t1", "consultar_produto", "{\"termo\":\"camisa preta\"}"), texto("Temos sim!"));
 
-        agente.responder(TEL, "tem camisa preta?");
+        agente.responder(EMPRESA, CLIENTE, "tem camisa preta?");
 
         ToolResponseMessage tr = toolResult(prompts(2).get(1));
         assertThat(tr.getResponses()).hasSize(1);
         assertThat(tr.getResponses().get(0).id()).isEqualTo("t1");
-        assertThat(tr.getResponses().get(0).responseData()).contains("P001");
+        assertThat(tr.getResponses().get(0).responseData()).contains(pretaM);
     }
 
     @Test
     void paraNoLimiteDeIteracoesComFallback() {
         when(chatModel.call(any(Prompt.class))).thenAnswer(
-                i -> comTool("t", "adicionar_ao_carrinho", "{\"produtoId\":\"P001\",\"quantidade\":1}"));
+                i -> comTool("t", "adicionar_ao_carrinho", "{\"varianteId\":\"" + pretaM + "\",\"quantidade\":1}"));
 
-        AgenteResponse r = agente.responder(TEL, "quero uma camisa");
+        AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "quero uma camisa");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
         verify(chatModel, times(5)).call(any(Prompt.class));
-        assertThat(estoque.consultar("P001")).isEqualTo(8);
+        verify(variantes, times(4)).baixarEstoque(UUID.fromString(pretaM), 1);
         assertThat(r.iteracoes()).hasSize(5);
     }
 
@@ -187,7 +198,7 @@ class AgenteSpringAiTest {
         }
         when(chatModel.call(any(Prompt.class))).thenReturn(comTools(onze));
 
-        AgenteResponse r = agente.responder(TEL, "meu carrinho");
+        AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "meu carrinho");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
         assertThat(r.iteracoes()).last().extracting(IteracaoTurnoResponse::observacao).asString()
@@ -203,9 +214,9 @@ class AgenteSpringAiTest {
                         comTool("t", "ver_carrinho", "{}"))
                 .thenReturn(texto("tudo certo"));
 
-        agente.responder(TEL, "oi");
-        assertThat(agente.responder(TEL, "meu carrinho").texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
-        agente.responder(TEL, "e agora?");
+        agente.responder(EMPRESA, CLIENTE, "oi");
+        assertThat(agente.responder(EMPRESA, CLIENTE, "meu carrinho").texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
+        agente.responder(EMPRESA, CLIENTE, "e agora?");
 
         Prompt terceiro = prompts(7).get(6);
         semToolUse(terceiro);
@@ -221,9 +232,9 @@ class AgenteSpringAiTest {
         when(chatModel.call(any(Prompt.class)))
                 .thenReturn(texto("olá"), comTools(onze), texto("tudo certo"));
 
-        agente.responder(TEL, "oi");
-        assertThat(agente.responder(TEL, "meu carrinho").texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
-        agente.responder(TEL, "e agora?");
+        agente.responder(EMPRESA, CLIENTE, "oi");
+        assertThat(agente.responder(EMPRESA, CLIENTE, "meu carrinho").texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
+        agente.responder(EMPRESA, CLIENTE, "e agora?");
 
         Prompt terceiro = prompts(3).get(2);
         semToolUse(terceiro);
@@ -233,10 +244,10 @@ class AgenteSpringAiTest {
     @Test
     void erroDaToolVoltaAoModelo() {
         when(chatModel.call(any(Prompt.class))).thenReturn(
-                comTool("t1", "adicionar_ao_carrinho", "{\"produtoId\":\"P001\",\"quantidade\":999}"),
+                comTool("t1", "adicionar_ao_carrinho", "{\"varianteId\":\"" + pretaM + "\",\"quantidade\":999}"),
                 texto("Não temos tudo isso."));
 
-        AgenteResponse r = agente.responder(TEL, "quero 999");
+        AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "quero 999");
 
         assertThat(r.texto()).isEqualTo("Não temos tudo isso.");
         assertThat(toolResult(prompts(2).get(1)).getResponses().get(0).responseData())
@@ -246,13 +257,13 @@ class AgenteSpringAiTest {
     @Test
     void entradaComFormatoInvalidoVoltaAoModeloComoErro() {
         when(chatModel.call(any(Prompt.class))).thenReturn(
-                comTool("t1", "adicionar_ao_carrinho", "{\"produtoId\":\"P001\",\"quantidade\":\"dois\"}"),
+                comTool("t1", "adicionar_ao_carrinho", "{\"varianteId\":\"" + pretaM + "\",\"quantidade\":\"dois\"}"),
                 texto("Quantas unidades?"));
 
-        AgenteResponse r = agente.responder(TEL, "quero duas");
+        AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "quero duas");
 
         assertThat(r.texto()).isEqualTo("Quantas unidades?");
-        assertThat(estoque.consultar("P001")).isEqualTo(12);
+        verify(variantes, never()).baixarEstoque(any(), anyInt());
     }
 
     @Test
@@ -262,9 +273,9 @@ class AgenteSpringAiTest {
                 .thenThrow(new RuntimeException("falha simulada"))
                 .thenReturn(texto("tudo certo"));
 
-        agente.responder(TEL, "oi");
-        AgenteResponse falha = agente.responder(TEL, "tudo bem?");
-        agente.responder(TEL, "e agora?");
+        agente.responder(EMPRESA, CLIENTE, "oi");
+        AgenteResponse falha = agente.responder(EMPRESA, CLIENTE, "tudo bem?");
+        agente.responder(EMPRESA, CLIENTE, "e agora?");
 
         assertThat(falha.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
         assertThat(resumo(prompts(3).get(2))).containsExactly("user:oi", "assistant:olá", "user:e agora?");
@@ -277,8 +288,8 @@ class AgenteSpringAiTest {
                 .thenThrow(new RuntimeException("falha simulada"))
                 .thenReturn(texto("tudo certo"));
 
-        assertThat(agente.responder(TEL, "meu carrinho").texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
-        agente.responder(TEL, "e agora?");
+        assertThat(agente.responder(EMPRESA, CLIENTE, "meu carrinho").texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
+        agente.responder(EMPRESA, CLIENTE, "e agora?");
 
         Prompt seguinte = prompts(3).get(2);
         semToolUse(seguinte);
@@ -289,8 +300,8 @@ class AgenteSpringAiTest {
     void textoEmBrancoRetornaFallbackSemSujarMemoria() {
         when(chatModel.call(any(Prompt.class))).thenReturn(texto("   "), texto("olá"));
 
-        AgenteResponse r = agente.responder(TEL, "oi");
-        agente.responder(TEL, "oi de novo");
+        AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "oi");
+        agente.responder(EMPRESA, CLIENTE, "oi de novo");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
         assertThat(r.iteracoes()).last().extracting(IteracaoTurnoResponse::observacao).asString().contains("sem texto");
@@ -298,13 +309,42 @@ class AgenteSpringAiTest {
     }
 
     @Test
-    void memoriaSeparadaPorTelefone() {
+    @DisplayName("T26 dois clientes têm memórias separadas")
+    void deveManterMemoriasSeparadas_quandoClientesDiferentes() {
         when(chatModel.call(any(Prompt.class))).thenReturn(texto("olá"), texto("oi, B"));
 
-        agente.responder("A", "oi");
-        agente.responder("B", "oi, sou B");
+        agente.responder(EMPRESA, UUID.randomUUID(), "oi");
+        agente.responder(EMPRESA, UUID.randomUUID(), "oi, sou B");
 
         assertThat(resumo(prompts(2).get(1))).containsExactly("user:oi, sou B");
+    }
+
+    @Test
+    @DisplayName("T26 a tool recebe empresaId e clienteId no ToolContext")
+    void deveEntregarEmpresaECliente_noToolContextDaTool() {
+        var capturadora = new ToolCapturadora();
+        var tools = new ToolRegistry(List.of(capturadora));
+        var ag = new AgenteSpringAi(ChatClient.builder(chatModel),
+                ToolCallingManager.builder().maxTotalToolCalls(10).build(), tools,
+                new AgenteProperties("claude-haiku-5-5", "low", 5));
+        when(chatModel.call(any(Prompt.class))).thenReturn(comTool("t1", "capturar", "{}"), texto("ok"));
+
+        ag.responder(EMPRESA, CLIENTE, "oi");
+
+        assertThat(capturadora.empresaId).isEqualTo(EMPRESA);
+        assertThat(capturadora.clienteId).isEqualTo(CLIENTE);
+    }
+
+    public static class ToolCapturadora implements AgentTool {
+        UUID empresaId;
+        UUID clienteId;
+
+        @Tool(name = "capturar", description = "captura o contexto")
+        public String capturar(ToolContext ctx) {
+            empresaId = ContextoTool.empresaId(ctx);
+            clienteId = ContextoTool.clienteId(ctx);
+            return "ok";
+        }
     }
 
     @Test
@@ -316,8 +356,8 @@ class AgenteSpringAiTest {
                 })
                 .thenReturn(texto("de novo"));
 
-        assertThat(agente.responder(TEL, "oi").texto()).isEqualTo("olá");
-        agente.responder(TEL, "e agora?");
+        assertThat(agente.responder(EMPRESA, CLIENTE, "oi").texto()).isEqualTo("olá");
+        agente.responder(EMPRESA, CLIENTE, "e agora?");
 
         assertThat(enviadas(ultimoPrompt())).hasSize(1);
     }
@@ -328,8 +368,8 @@ class AgenteSpringAiTest {
                 comTool("t1", "consultar_produto", "{\"termo\":\"camisa preta\"}"), texto("Temos sim!"),
                 texto("Custa 49,90."));
 
-        agente.responder(TEL, "tem camisa preta?");
-        agente.responder(TEL, "quanto custa?");
+        agente.responder(EMPRESA, CLIENTE, "tem camisa preta?");
+        agente.responder(EMPRESA, CLIENTE, "quanto custa?");
 
         Prompt turno2 = prompts(3).get(2);
         assertThat(toolResult(turno2).getResponses().get(0).id()).isEqualTo("t1");
@@ -349,7 +389,7 @@ class AgenteSpringAiTest {
                 respostas.subList(1, respostas.size()).toArray(ChatResponse[]::new));
 
         for (int i = 0; i < 6; i++) {
-            agente.responder(TEL, "mensagem " + i);
+            agente.responder(EMPRESA, CLIENTE, "mensagem " + i);
         }
 
         List<Message> sexto = enviadas(ultimoPrompt());
@@ -361,7 +401,7 @@ class AgenteSpringAiTest {
     void requisicaoLevaModeloEffortEAsCincoTools() {
         when(chatModel.call(any(Prompt.class))).thenReturn(texto("olá"));
 
-        agente.responder(TEL, "oi");
+        agente.responder(EMPRESA, CLIENTE, "oi");
 
         Prompt primeiro = prompts(1).get(0);
         assertThat(primeiro.getOptions()).isInstanceOf(AnthropicChatOptions.class);
@@ -379,9 +419,9 @@ class AgenteSpringAiTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(
                 texto("olá"), resposta(new AssistantMessage("resposta cortada"), "max_tokens"), texto("tudo certo"));
 
-        agente.responder(TEL, "oi");
-        AgenteResponse r = agente.responder(TEL, "conta uma história");
-        agente.responder(TEL, "e agora?");
+        agente.responder(EMPRESA, CLIENTE, "oi");
+        AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "conta uma história");
+        agente.responder(EMPRESA, CLIENTE, "e agora?");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
         assertThat(r.iteracoes()).last().extracting(IteracaoTurnoResponse::observacao).asString().contains("max_tokens");
@@ -393,7 +433,7 @@ class AgenteSpringAiTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(
                 comTools(verCarrinho(0, 4)), comTools(verCarrinho(4, 4)), comTools(verCarrinho(8, 3)));
 
-        AgenteResponse r = agente.responder(TEL, "meu carrinho");
+        AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "meu carrinho");
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
         assertThat(r.iteracoes()).last().extracting(IteracaoTurnoResponse::observacao).asString()
@@ -401,7 +441,7 @@ class AgenteSpringAiTest {
         verify(chatModel, times(3)).call(any(Prompt.class));
 
         when(chatModel.call(any(Prompt.class))).thenReturn(texto("ok"));
-        agente.responder(TEL, "e agora?");
+        agente.responder(EMPRESA, CLIENTE, "e agora?");
         Prompt seguinte = ultimoPrompt();
         semToolUse(seguinte);
         assertThat(resumo(seguinte)).containsExactly("user:e agora?");

@@ -2,22 +2,43 @@ package app.gestaoIAWpp.atendimento;
 
 import app.gestaoIAWpp.ai.AgenteAtendimento;
 import app.gestaoIAWpp.ai.dto.AgenteResponse;
+import app.gestaoIAWpp.cliente.Cliente;
+import app.gestaoIAWpp.cliente.ClienteService;
+import app.gestaoIAWpp.empresa.NumeroNaoCadastradoException;
+import app.gestaoIAWpp.empresa.NumeroWhatsappRepository;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
-/** Valida a mensagem recebida e a repassa ao agente. Fica entre o canal (simulador/WhatsApp) e a IA. */
+/**
+ * Entrada agnóstica de canal: valida a mensagem, resolve número, empresa e cliente e repassa ao agente.
+ * Fica entre o canal (simulador/WhatsApp) e a IA.
+ */
 @Service
 public class AtendimentoService {
 
+    private final NumeroWhatsappRepository numeros;
+    private final ClienteService clientes;
     private final AgenteAtendimento agente;
 
-    public AtendimentoService(AgenteAtendimento agente) {
+    public AtendimentoService(NumeroWhatsappRepository numeros, ClienteService clientes, AgenteAtendimento agente) {
+        this.numeros = numeros;
+        this.clientes = clientes;
         this.agente = agente;
     }
 
-    public AgenteResponse processarMensagem(String telefone, String texto) {
-        if (telefone == null || telefone.isBlank() || texto == null || texto.isBlank()) {
+    /** {@code telefone} pode ser nulo: o webhook do WhatsApp pode não informá-lo. */
+    public AgenteResponse processarMensagem(String phoneNumberId, String userId, String telefone, String texto) {
+        if (userId == null || userId.isBlank() || texto == null || texto.isBlank()) {
             throw new IllegalArgumentException("Telefone e texto são obrigatórios.");
         }
-        return agente.responder(telefone, texto.strip());
+        UUID empresaId = empresaDoNumero(phoneNumberId);
+        Cliente cliente = clientes.identificar(empresaId, userId, telefone);
+        return agente.responder(empresaId, cliente.getId(), texto.strip());
+    }
+
+    public UUID empresaDoNumero(String phoneNumberId) {
+        return numeros.findByPhoneNumberIdAndAtivoTrue(phoneNumberId)
+                .orElseThrow(NumeroNaoCadastradoException::new)
+                .getEmpresaId();
     }
 }

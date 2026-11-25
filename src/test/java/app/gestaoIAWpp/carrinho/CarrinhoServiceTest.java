@@ -1,117 +1,187 @@
 package app.gestaoIAWpp.carrinho;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
-import app.gestaoIAWpp.produto.EstoqueInsuficienteException;
-import app.gestaoIAWpp.produto.EstoqueService;
-import app.gestaoIAWpp.produto.ProdutoNaoEncontradoException;
-import app.gestaoIAWpp.produto.ProdutoRepositoryEmMemoria;
+import app.gestaoIAWpp.produto.CatalogoTeste;
+import app.gestaoIAWpp.produto.VarianteNaoEncontradaException;
+import app.gestaoIAWpp.produto.VarianteRepository;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.json.JsonMapper;
 
+/**
+ * Regras de decisão do carrinho com os repositórios mockados. O que depende do SQL (upsert, índice
+ * parcial, rollback, estoque real) está no {@code CarrinhoServiceIT}.
+ */
 class CarrinhoServiceTest {
 
-    private static final String TEL = "5511999990000";
+    private static final UUID EMPRESA = UUID.randomUUID();
+    private static final UUID CLIENTE = UUID.randomUUID();
 
-    private EstoqueService estoque;
+    private VarianteRepository variantes;
+    private CarrinhoRepository carrinhos;
     private CarrinhoService carrinho;
-    private final JsonMapper mapper = JsonMapper.builder().build();
+    private UUID pretaM;
+    private UUID brancaM;
 
     @BeforeEach
     void setUp() {
-        estoque = new EstoqueService();
-        carrinho = new CarrinhoService(new ProdutoRepositoryEmMemoria(), estoque);
+        var catalogo = CatalogoTeste.lojaDemo(EMPRESA);
+        variantes = catalogo.varianteRepository();
+        carrinhos = CarrinhoTeste.repositorio(variantes);
+        carrinho = new CarrinhoService(variantes, carrinhos);
+        pretaM = catalogo.variante("Camisa Básica (Preta / M)").getId();
+        brancaM = catalogo.variante("Camisa Básica (Branca / M)").getId();
     }
 
     @Test
-    void adicionarBaixaEstoqueERetornaResumo() {
-        var r = carrinho.adicionar(TEL, "P001", 2);
-        assertThat(r.itens()).containsExactly(new ItemCarrinho("P001", "Camisa Básica Preta M", new BigDecimal("49.90"), 2));
-        assertThat(r.total()).isEqualByComparingTo("99.80");
-        assertThat(estoque.consultar("P001")).isEqualTo(10);
+    @DisplayName("T17 item com 3, remover 1: item fica com 2 e devolve 1")
+    void deveDiminuirItemEDevolver_quandoRemoveMenosQueOItem() {
+        carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 3);
+
+        CarrinhoResumo r = carrinho.remover(EMPRESA, CLIENTE, pretaM, 1);
+
+        assertThat(r.itens()).singleElement().satisfies(i -> assertThat(i.quantidade()).isEqualTo(2));
+        assertThat(r.total()).isEqualTo(new BigDecimal("99.80"));
+        verify(variantes).devolverEstoque(pretaM, 1);
     }
 
     @Test
-    void adicionarMesmoProdutoSomaQuantidade() {
-        carrinho.adicionar(TEL, "P001", 2);
-        assertThat(carrinho.adicionar(TEL, "P001", 3).itens().get(0).quantidade()).isEqualTo(5);
+    @DisplayName("T17 item com 3, remover 3: item sai e devolve 3")
+    void deveTirarItemEDevolverTudo_quandoRemoveAQuantidadeDoItem() {
+        carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 3);
+
+        assertThat(carrinho.remover(EMPRESA, CLIENTE, pretaM, 3).itens()).isEmpty();
+        verify(variantes).devolverEstoque(pretaM, 3);
     }
 
     @Test
-    void segundaAdicaoAcimaDoEstoqueFalhaSemAlterarNada() {
-        carrinho.adicionar(TEL, "P001", 10);
-        assertThrows(EstoqueInsuficienteException.class, () -> carrinho.adicionar(TEL, "P001", 5));
-        assertThat(carrinho.ver(TEL).itens().get(0).quantidade()).isEqualTo(10);
-        assertThat(estoque.consultar("P001")).isEqualTo(2);
+    @DisplayName("T17 item com 3, remover sem quantidade: item sai e devolve 3")
+    void deveTirarItemEDevolverTudo_quandoRemoveSemQuantidade() {
+        carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 3);
+        carrinho.adicionar(EMPRESA, CLIENTE, brancaM, 1);
+
+        CarrinhoResumo r = carrinho.remover(EMPRESA, CLIENTE, pretaM, null);
+
+        assertThat(r.itens()).extracting(ItemCarrinhoResumo::varianteId).containsExactly(brancaM);
+        verify(variantes).devolverEstoque(pretaM, 3);
     }
 
     @Test
-    void adicionarProdutoInexistenteLanca() {
-        assertThrows(ProdutoNaoEncontradoException.class, () -> carrinho.adicionar(TEL, "P999", 1));
+    @DisplayName("T18 adicionar com 0 é recusado antes de tocar os repositórios")
+    void deveRecusarAdicionar_quandoQuantidadeZero() {
+        assertThatThrownBy(() -> carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Quantidade deve ser maior que zero.");
+        verifyNoInteractions(variantes, carrinhos);
     }
 
     @Test
-    void removerParcialDevolveEstoque() {
-        carrinho.adicionar(TEL, "P001", 3);
-        carrinho.remover(TEL, "P001", 1);
-        assertThat(carrinho.ver(TEL).itens().get(0).quantidade()).isEqualTo(2);
-        assertThat(estoque.consultar("P001")).isEqualTo(10);
+    @DisplayName("T18 remover com 0 é recusado antes de tocar os repositórios")
+    void deveRecusarRemover_quandoQuantidadeZero() {
+        assertThatThrownBy(() -> carrinho.remover(EMPRESA, CLIENTE, pretaM, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Quantidade deve ser maior que zero.");
+        verifyNoInteractions(variantes, carrinhos);
     }
 
     @Test
-    void removerSemQuantidadeRemoveTudo() {
-        carrinho.adicionar(TEL, "P001", 3);
-        assertThat(carrinho.remover(TEL, "P001", null).itens()).isEmpty();
-        assertThat(estoque.consultar("P001")).isEqualTo(12);
+    @DisplayName("T18 adicionar com 1 é aceito e o resumo traz o preço atual da variante")
+    void deveAceitarAdicionar_quandoQuantidadeUm() {
+        CarrinhoResumo r = carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 1);
+
+        assertThat(r.itens()).containsExactly(
+                new ItemCarrinhoResumo(pretaM, "Camisa Básica (Preta / M)", new BigDecimal("49.90"), 1));
+        assertThat(r.total()).isEqualTo(new BigDecimal("49.90"));
+        verify(variantes).baixarEstoque(pretaM, 1);
     }
 
     @Test
-    void removerMaisQueOCarrinhoRemoveTudo() {
-        carrinho.adicionar(TEL, "P001", 2);
-        assertThat(carrinho.remover(TEL, "P001", 50).itens()).isEmpty();
-        assertThat(estoque.consultar("P001")).isEqualTo(12);
+    @DisplayName("T18 remover com 1 é aceito")
+    void deveAceitarRemover_quandoQuantidadeUm() {
+        carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 1);
+
+        assertThat(carrinho.remover(EMPRESA, CLIENTE, pretaM, 1).itens()).isEmpty();
+        verify(variantes).devolverEstoque(pretaM, 1);
     }
 
     @Test
-    void removerItemAusenteLanca() {
-        assertThrows(ItemNaoEstaNoCarrinhoException.class, () -> carrinho.remover(TEL, "P003", 1));
+    @DisplayName("T19 remover variante fora do carrinho: erro e nenhum estoque devolvido")
+    void deveRecusarRemover_quandoVarianteNaoEstaNoCarrinho() {
+        carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 1);
+
+        assertThatThrownBy(() -> carrinho.remover(EMPRESA, CLIENTE, brancaM, 1))
+                .isInstanceOf(ItemNaoEstaNoCarrinhoException.class)
+                .hasMessage("Variante " + brancaM + " não está no carrinho.");
+        verify(variantes, never()).devolverEstoque(any(), anyInt());
     }
 
     @Test
-    void removerQuantidadeInvalidaLancaAntesDeChecarPresenca() {
-        var e = assertThrows(IllegalArgumentException.class, () -> carrinho.remover(TEL, "P003", 0));
-        assertThat(e.getMessage()).isEqualTo("Quantidade deve ser maior que zero.");
+    @DisplayName("Review Focus: cliente sem carrinho aberto vê lista vazia e total 0.00")
+    void deveDevolverCarrinhoVazio_quandoClienteNaoTemCarrinhoAberto() {
+        CarrinhoResumo r = carrinho.ver(CLIENTE);
+
+        assertThat(r.itens()).isEmpty();
+        assertThat(r.total()).isEqualTo(new BigDecimal("0.00"));
     }
 
     @Test
-    void carrinhosSaoIsoladosPorTelefone() {
-        carrinho.adicionar("A", "P001", 1);
-        assertThat(carrinho.ver("B").itens()).isEmpty();
-        assertThat(carrinho.ver("B").total()).isEqualByComparingTo("0.00");
+    @DisplayName("Review Focus: remover sem carrinho aberto é 'não está no carrinho', não NullPointerException")
+    void deveRecusarRemover_quandoClienteNaoTemCarrinhoAberto() {
+        assertThatThrownBy(() -> carrinho.remover(EMPRESA, CLIENTE, pretaM, null))
+                .isInstanceOf(ItemNaoEstaNoCarrinhoException.class)
+                .hasMessage("Variante " + pretaM + " não está no carrinho.");
+        verify(variantes, never()).devolverEstoque(any(), anyInt());
     }
 
     @Test
-    void limparTodosEsvaziaCarrinhosSemDevolverEstoque() {
-        carrinho.adicionar(TEL, "P001", 2);
-        carrinho.limparTodos();
-        assertThat(carrinho.ver(TEL).itens()).isEmpty();
-        assertThat(estoque.consultar("P001")).isEqualTo(10);
+    @DisplayName("T19 remover só enxerga o carrinho aberto da empresa informada")
+    void deveRecusarRemover_quandoCarrinhoEDeOutraEmpresa() {
+        carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 1);
+
+        assertThatThrownBy(() -> carrinho.remover(UUID.randomUUID(), CLIENTE, pretaM, null))
+                .isInstanceOf(ItemNaoEstaNoCarrinhoException.class);
+        verify(variantes, never()).devolverEstoque(any(), anyInt());
     }
 
     @Test
-    void reiniciarTudoLimpaCarrinhosERestauraEstoque() {
-        carrinho.adicionar(TEL, "P001", 2);
-        carrinho.reiniciarTudo();
-        assertThat(carrinho.ver(TEL).itens()).isEmpty();
-        assertThat(estoque.consultar("P001")).isEqualTo(12);
-    }
+    @DisplayName("T20 adicionar variante não encontrada na empresa: erro sem baixar estoque")
+    void deveRecusarAdicionar_quandoVarianteNaoEncontrada() {
+        UUID inexistente = UUID.randomUUID();
 
+        assertThatThrownBy(() -> carrinho.adicionar(EMPRESA, CLIENTE, inexistente, 1))
+                .isInstanceOf(VarianteNaoEncontradaException.class)
+                .hasMessage("Variante " + inexistente + " não encontrada.");
+        verify(variantes, never()).baixarEstoque(any(), anyInt());
+        verifyNoInteractions(carrinhos);
+    }
     @Test
-    void itemSerializaSubtotal() {
-        assertThat(mapper.writeValueAsString(carrinho.adicionar(TEL, "P001", 2)))
-                .contains("\"subtotal\":99.80", "\"total\":99.80");
+    @DisplayName("RN14 reset apaga o carrinho logo depois de criado: adicionar cria de novo e grava o item")
+    void deveRecriarCarrinhoEGravarItem_quandoResetApagaCarrinhoRecemCriado() {
+        when(carrinhos.travarDoCliente(CLIENTE, StatusCarrinho.ABERTO))
+                .thenReturn(Optional.empty())
+                .thenAnswer(inv -> {
+                    // Simula o reset: apaga o carrinho entre o INSERT e a trava.
+                    carrinhos.findByClienteIdAndStatus(CLIENTE, StatusCarrinho.ABERTO)
+                            .ifPresent(c -> carrinhos.deleteAllByIdInBatch(List.of(c.getId())));
+                    return Optional.empty();
+                })
+                .thenAnswer(inv -> carrinhos.findByClienteIdAndStatus(CLIENTE, StatusCarrinho.ABERTO));
+
+        CarrinhoResumo r = carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 2);
+
+        assertThat(r.itens()).singleElement().satisfies(i -> assertThat(i.quantidade()).isEqualTo(2));
+        assertThat(carrinho.ver(CLIENTE)).isEqualTo(r);
     }
 }
