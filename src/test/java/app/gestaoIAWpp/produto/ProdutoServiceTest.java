@@ -2,7 +2,11 @@ package app.gestaoIAWpp.produto;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,7 +19,7 @@ class ProdutoServiceTest {
     private static final UUID EMPRESA = UUID.randomUUID();
 
     private static ProdutoService service(CatalogoTeste catalogo) {
-        return new ProdutoService(catalogo.produtoRepository(), catalogo.varianteRepository());
+        return catalogo.produtoService();
     }
 
     @Test
@@ -203,6 +207,95 @@ class ProdutoServiceTest {
         assertThat(r.produtos()).singleElement().satisfies(p -> assertThat(p.variantes())
                 .extracting(VarianteResumo::opcoes)
                 .containsExactly("Cor: Preta, Tamanho: M", "Cor: Preta, Tamanho: G", "Cor: Branca, Tamanho: M"));
+    }
+
+    @Test
+    @DisplayName("M06 baixa o estoque quando há saldo suficiente")
+    void deveBaixarEstoque_quandoHaSaldoSuficiente() {
+        var c = new CatalogoTeste(EMPRESA);
+        Variante v = c.variante(c.produto("Camisa", null, null), "10.00", 2);
+        var variantes = c.varianteRepository();
+        var service = new ProdutoService(c.produtoRepository(), variantes);
+
+        service.baixarEstoque(v.getId(), 2);
+
+        verify(variantes).baixarEstoque(v.getId(), 2);
+    }
+
+    @Test
+    @DisplayName("M05 saldo menor que o solicitado: a exceção traz nome e saldo lidos depois da falha")
+    void deveLancarEstoqueInsuficiente_quandoSaldoMenorQueSolicitado() {
+        var c = new CatalogoTeste(EMPRESA);
+        Variante v = c.variante(c.produto("Camisa", null, null), "10.00", 1);
+        var service = c.produtoService();
+
+        assertThatThrownBy(() -> service.baixarEstoque(v.getId(), 2))
+                .isInstanceOfSatisfying(EstoqueInsuficienteException.class, e -> {
+                    assertThat(e).hasMessage("Estoque insuficiente para Camisa: solicitado 2, disponível 1.");
+                    assertThat(e.getDisponivel()).isEqualTo(1);
+                    assertThat(e.getSolicitado()).isEqualTo(2);
+                });
+    }
+
+    @Test
+    @DisplayName("Baixa de variante que não existe lança VarianteNaoEncontrada")
+    void deveLancarVarianteNaoEncontrada_quandoBaixaVarianteInexistente() {
+        UUID id = UUID.randomUUID();
+        var service = CatalogoTeste.lojaDemo(EMPRESA).produtoService();
+
+        assertThatThrownBy(() -> service.baixarEstoque(id, 1))
+                .isInstanceOf(VarianteNaoEncontradaException.class)
+                .hasMessage("Variante " + id + " não encontrada.");
+    }
+
+    @Test
+    @DisplayName("Devolver estoque delega a devolução atômica ao repositório")
+    void deveDevolverEstoque_quandoChamado() {
+        var c = CatalogoTeste.lojaDemo(EMPRESA);
+        var variantes = c.varianteRepository();
+        var service = new ProdutoService(c.produtoRepository(), variantes);
+        UUID id = UUID.randomUUID();
+
+        service.devolverEstoque(id, 3);
+
+        verify(variantes).devolverEstoque(id, 3);
+    }
+
+    @Test
+    @DisplayName("M08 resumo de variante inativa traz o preço atual e o nome completo")
+    void deveResumirVarianteInativaComPrecoAtual() {
+        var c = CatalogoTeste.lojaDemo(EMPRESA);
+        Produto basica = c.produtos().get(0);
+        ValorOpcao[] valores = basica.getVariantes().iterator().next().valoresOrdenados().toArray(new ValorOpcao[0]);
+        Variante inativa = c.varianteInativa(basica, "59.90", 0, valores);
+
+        var mapa = c.produtoService().resumirVariantes(List.of(inativa.getId()));
+
+        assertThat(mapa).containsOnlyKeys(inativa.getId());
+        assertThat(mapa.get(inativa.getId()).preco()).isEqualByComparingTo(new BigDecimal("59.90"));
+        assertThat(mapa.get(inativa.getId()).nome()).isEqualTo(inativa.nomeCompleto());
+    }
+
+    @Test
+    @DisplayName("M09 id que não existe fica fora do mapa do resumo")
+    void deveOmitirIdInexistente_quandoResumeVariantes() {
+        var c = CatalogoTeste.lojaDemo(EMPRESA);
+        Variante pretaM = c.variante("Camisa Básica (Preta / M)");
+
+        var mapa = c.produtoService().resumirVariantes(List.of(pretaM.getId(), UUID.randomUUID()));
+
+        assertThat(mapa).containsOnlyKeys(pretaM.getId());
+    }
+
+    @Test
+    @DisplayName("Lista de ids vazia devolve mapa vazio sem consultar o repositório")
+    void deveDevolverMapaVazioSemConsultar_quandoListaDeIdsVazia() {
+        var c = CatalogoTeste.lojaDemo(EMPRESA);
+        var variantes = c.varianteRepository();
+        var service = new ProdutoService(c.produtoRepository(), variantes);
+
+        assertThat(service.resumirVariantes(List.of())).isEmpty();
+        verifyNoInteractions(variantes);
     }
 
     private static CatalogoTeste catalogoDeCamisas(int quantidade) {

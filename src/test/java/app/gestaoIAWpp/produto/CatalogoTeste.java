@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -102,6 +103,11 @@ public final class CatalogoTeste {
                 .findFirst().orElseThrow();
     }
 
+    /** O {@link ProdutoService} real sobre os repositórios mockados deste catálogo. */
+    public ProdutoService produtoService() {
+        return new ProdutoService(produtoRepository(), varianteRepository());
+    }
+
     /** {@code catalogoAtivo(empresaId)} devolve os produtos ativos deste catálogo. */
     public ProdutoRepository produtoRepository() {
         ProdutoRepository repo = mock(ProdutoRepository.class);
@@ -111,7 +117,8 @@ public final class CatalogoTeste {
 
     /**
      * {@code daEmpresa} acha a variante ativa da empresa; {@code baixarEstoque} afeta 1 linha se houver
-     * saldo (sem alterar a entidade); {@code devolverEstoque} afeta 1 linha; {@code findById} acha a variante.
+     * saldo (sem alterar a entidade); {@code devolverEstoque} afeta 1 linha; {@code findById} acha a variante;
+     * {@code resumoDasVariantes} devolve as variantes do catálogo cujo id está na coleção, ativas ou não.
      */
     public VarianteRepository varianteRepository() {
         VarianteRepository repo = mock(VarianteRepository.class);
@@ -121,7 +128,15 @@ public final class CatalogoTeste {
                 .filter(v -> v.getQuantidadeEstoque() >= (int) inv.getArgument(1))
                 .map(v -> 1).orElse(0));
         when(repo.devolverEstoque(any(), anyInt())).thenReturn(1);
+        when(repo.resumoDasVariantes(any())).thenAnswer(inv -> resumoDasVariantes(inv.getArgument(0)));
         return repo;
+    }
+
+    private List<Variante> resumoDasVariantes(Collection<UUID> ids) {
+        return produtos.stream()
+                .flatMap(p -> p.getVariantes().stream())
+                .filter(v -> ids.contains(v.getId()))
+                .toList();
     }
 
     private Optional<Variante> daEmpresa(UUID varianteId, UUID empresa) {
