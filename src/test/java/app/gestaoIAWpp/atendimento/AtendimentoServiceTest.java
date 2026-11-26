@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 
 import app.gestaoIAWpp.ai.AgenteAtendimento;
 import app.gestaoIAWpp.ai.dto.AgenteResponse;
-import app.gestaoIAWpp.cliente.Cliente;
+import app.gestaoIAWpp.cliente.ClienteResumo;
 import app.gestaoIAWpp.cliente.ClienteService;
 import app.gestaoIAWpp.empresa.NumeroNaoCadastradoException;
 import app.gestaoIAWpp.empresa.NumeroWhatsapp;
@@ -53,8 +53,7 @@ class AtendimentoServiceTest {
     @DisplayName("T23 identifica o cliente e passa os ids ao agente")
     void deveIdentificarClienteEPassarIdsAoAgente_quandoNumeroValido() {
         numeroAtivo();
-        Cliente cliente = mock(Cliente.class);
-        when(cliente.getId()).thenReturn(CLIENTE);
+        ClienteResumo cliente = new ClienteResumo(CLIENTE, USER_ID, "5511999990000");
         when(clientes.identificar(EMPRESA, USER_ID, "5511999990000")).thenReturn(cliente);
         when(agente.responder(EMPRESA, CLIENTE, "oi")).thenReturn(new AgenteResponse("olá", List.of()));
 
@@ -67,8 +66,7 @@ class AtendimentoServiceTest {
     @Test
     void deveAceitarTelefoneNulo_quandoCanalNaoInformaTelefone() {
         numeroAtivo();
-        Cliente cliente = mock(Cliente.class);
-        when(cliente.getId()).thenReturn(CLIENTE);
+        ClienteResumo cliente = new ClienteResumo(CLIENTE, USER_ID, null);
         when(clientes.identificar(EMPRESA, USER_ID, null)).thenReturn(cliente);
         when(agente.responder(EMPRESA, CLIENTE, "oi")).thenReturn(new AgenteResponse("olá", List.of()));
 

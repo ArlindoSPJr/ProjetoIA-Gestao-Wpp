@@ -2,7 +2,7 @@ package app.gestaoIAWpp.atendimento;
 
 import app.gestaoIAWpp.ai.AgenteAtendimento;
 import app.gestaoIAWpp.ai.dto.AgenteResponse;
-import app.gestaoIAWpp.cliente.Cliente;
+import app.gestaoIAWpp.cliente.ClienteResumo;
 import app.gestaoIAWpp.cliente.ClienteService;
 import app.gestaoIAWpp.empresa.NumeroNaoCadastradoException;
 import app.gestaoIAWpp.empresa.NumeroWhatsappRepository;
@@ -32,8 +32,8 @@ public class AtendimentoService {
             throw new IllegalArgumentException("Telefone e texto são obrigatórios.");
         }
         UUID empresaId = empresaDoNumero(phoneNumberId);
-        Cliente cliente = clientes.identificar(empresaId, userId, telefone);
-        return agente.responder(empresaId, cliente.getId(), texto.strip());
+        ClienteResumo cliente = clientes.identificar(empresaId, userId, telefone);
+        return agente.responder(empresaId, cliente.id(), texto.strip());
     }
 
     public UUID empresaDoNumero(String phoneNumberId) {

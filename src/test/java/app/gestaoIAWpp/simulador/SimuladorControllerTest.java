@@ -2,7 +2,6 @@ package app.gestaoIAWpp.simulador;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -22,7 +21,7 @@ import app.gestaoIAWpp.atendimento.AtendimentoService;
 import app.gestaoIAWpp.carrinho.CarrinhoResumo;
 import app.gestaoIAWpp.carrinho.CarrinhoService;
 import app.gestaoIAWpp.carrinho.ItemCarrinhoResumo;
-import app.gestaoIAWpp.cliente.Cliente;
+import app.gestaoIAWpp.cliente.ClienteResumo;
 import app.gestaoIAWpp.cliente.ClienteService;
 import app.gestaoIAWpp.empresa.NumeroNaoCadastradoException;
 import app.gestaoIAWpp.produto.ProdutoService;
@@ -103,8 +102,7 @@ class SimuladorControllerTest {
         UUID empresa = UUID.randomUUID();
         UUID clienteId = UUID.randomUUID();
         UUID varianteId = UUID.randomUUID();
-        Cliente cliente = mock(Cliente.class);
-        when(cliente.getId()).thenReturn(clienteId);
+        ClienteResumo cliente = new ClienteResumo(clienteId, "BR.SIM5511999990000", "5511999990000");
         when(atendimento.empresaDoNumero("simulador-loja-demo")).thenReturn(empresa);
         when(clientes.buscar(empresa, "BR.SIM5511999990000")).thenReturn(Optional.of(cliente));
         var item = new ItemCarrinhoResumo(varianteId, "Camisa Básica (Preta / M)", new BigDecimal("49.90"), 2);

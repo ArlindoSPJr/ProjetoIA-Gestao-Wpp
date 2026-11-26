@@ -67,7 +67,7 @@ public class SimuladorController {
                 .map(v -> new ItemEstoqueView(v.varianteId(), v.nome(), v.preco(), v.quantidadeDisponivel()))
                 .toList();
         CarrinhoResumo resumo = clientes.buscar(empresaId, userId)
-                .map(c -> carrinho.ver(c.getId()))
+                .map(c -> carrinho.ver(c.id()))
                 .orElseGet(() -> new CarrinhoResumo(List.of(), new BigDecimal("0.00")));
         return new EstadoSimulador(resumo, itens);
     }

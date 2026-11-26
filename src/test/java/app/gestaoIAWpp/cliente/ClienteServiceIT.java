@@ -40,10 +40,13 @@ class ClienteServiceIT {
 	void deveCriarEReaproveitarCliente_quandoIdentificaDuasVezes() {
 		UUID empresa = empresaDoSeed();
 
-		Cliente primeiro = service.identificar(empresa, USER_ID, "5511999990000");
-		Cliente segundo = service.identificar(empresa, USER_ID, "5511999990000");
+		ClienteResumo primeiro = service.identificar(empresa, USER_ID, "5511999990000");
+		ClienteResumo segundo = service.identificar(empresa, USER_ID, "5511999990000");
 
-		assertThat(segundo.getId()).isEqualTo(primeiro.getId());
+		assertThat(segundo.id()).isEqualTo(primeiro.id());
+		assertThat(segundo.userId()).isEqualTo(USER_ID);
+		assertThat(segundo.telefone()).isEqualTo("5511999990000");
+		assertThat(segundo).isEqualTo(primeiro);
 		assertThat(jdbc.queryForObject("SELECT count(*) FROM cliente WHERE user_id = ?", Integer.class, USER_ID))
 				.isEqualTo(1);
 	}
@@ -64,9 +67,9 @@ class ClienteServiceIT {
 	void deveAceitarTelefoneNoLimite_quandoInsereCliente(String telefone) {
 		UUID empresa = empresaDoSeed();
 
-		Cliente cliente = service.identificar(empresa, "u-" + telefone, telefone);
+		ClienteResumo cliente = service.identificar(empresa, "u-" + telefone, telefone);
 
-		assertThat(cliente.getTelefone()).isEqualTo(telefone);
+		assertThat(cliente.telefone()).isEqualTo(telefone);
 	}
 
 	@Test
