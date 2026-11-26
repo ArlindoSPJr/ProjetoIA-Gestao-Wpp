@@ -9,13 +9,11 @@ import static org.mockito.Mockito.when;
 
 import app.gestaoIAWpp.ai.AgenteAtendimento;
 import app.gestaoIAWpp.ai.dto.AgenteResponse;
-import app.gestaoIAWpp.cliente.Cliente;
+import app.gestaoIAWpp.cliente.ClienteResumo;
 import app.gestaoIAWpp.cliente.ClienteService;
 import app.gestaoIAWpp.empresa.NumeroNaoCadastradoException;
-import app.gestaoIAWpp.empresa.NumeroWhatsapp;
-import app.gestaoIAWpp.empresa.NumeroWhatsappRepository;
+import app.gestaoIAWpp.empresa.NumeroWhatsappService;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,21 +25,19 @@ class AtendimentoServiceTest {
     private static final String NUMERO = "simulador-loja-demo";
     private static final String USER_ID = "BR.SIM5511999990000";
 
-    private final NumeroWhatsappRepository numeros = mock(NumeroWhatsappRepository.class);
+    private final NumeroWhatsappService numeros = mock(NumeroWhatsappService.class);
     private final ClienteService clientes = mock(ClienteService.class);
     private final AgenteAtendimento agente = mock(AgenteAtendimento.class);
     private final AtendimentoService service = new AtendimentoService(numeros, clientes, agente);
 
     private void numeroAtivo() {
-        NumeroWhatsapp numero = mock(NumeroWhatsapp.class);
-        when(numero.getEmpresaId()).thenReturn(EMPRESA);
-        when(numeros.findByPhoneNumberIdAndAtivoTrue(NUMERO)).thenReturn(Optional.of(numero));
+        when(numeros.empresaDoNumero(NUMERO)).thenReturn(EMPRESA);
     }
 
     @Test
     @DisplayName("T22 recusa sem chamar o agente quando o número não existe ou está inativo")
     void deveRecusarSemChamarAgente_quandoNumeroNaoCadastradoOuInativo() {
-        when(numeros.findByPhoneNumberIdAndAtivoTrue(NUMERO)).thenReturn(Optional.empty());
+        when(numeros.empresaDoNumero(NUMERO)).thenThrow(new NumeroNaoCadastradoException());
 
         assertThrows(NumeroNaoCadastradoException.class,
                 () -> service.processarMensagem(NUMERO, USER_ID, "5511999990000", "oi"));
@@ -53,8 +49,7 @@ class AtendimentoServiceTest {
     @DisplayName("T23 identifica o cliente e passa os ids ao agente")
     void deveIdentificarClienteEPassarIdsAoAgente_quandoNumeroValido() {
         numeroAtivo();
-        Cliente cliente = mock(Cliente.class);
-        when(cliente.getId()).thenReturn(CLIENTE);
+        ClienteResumo cliente = new ClienteResumo(CLIENTE, USER_ID, "5511999990000");
         when(clientes.identificar(EMPRESA, USER_ID, "5511999990000")).thenReturn(cliente);
         when(agente.responder(EMPRESA, CLIENTE, "oi")).thenReturn(new AgenteResponse("olá", List.of()));
 
@@ -67,8 +62,7 @@ class AtendimentoServiceTest {
     @Test
     void deveAceitarTelefoneNulo_quandoCanalNaoInformaTelefone() {
         numeroAtivo();
-        Cliente cliente = mock(Cliente.class);
-        when(cliente.getId()).thenReturn(CLIENTE);
+        ClienteResumo cliente = new ClienteResumo(CLIENTE, USER_ID, null);
         when(clientes.identificar(EMPRESA, USER_ID, null)).thenReturn(cliente);
         when(agente.responder(EMPRESA, CLIENTE, "oi")).thenReturn(new AgenteResponse("olá", List.of()));
 
@@ -85,19 +79,5 @@ class AtendimentoServiceTest {
 
         assertThat(e1).hasMessage("Telefone e texto são obrigatórios.");
         verifyNoInteractions(numeros, clientes, agente);
-    }
-
-    @Test
-    void deveDevolverEmpresa_quandoNumeroAtivo() {
-        numeroAtivo();
-
-        assertThat(service.empresaDoNumero(NUMERO)).isEqualTo(EMPRESA);
-    }
-
-    @Test
-    void deveLancar_quandoEmpresaDoNumeroNaoCadastrado() {
-        when(numeros.findByPhoneNumberIdAndAtivoTrue("x")).thenReturn(Optional.empty());
-
-        assertThrows(NumeroNaoCadastradoException.class, () -> service.empresaDoNumero("x"));
     }
 }

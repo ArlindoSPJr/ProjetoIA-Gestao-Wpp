@@ -2,7 +2,6 @@ package app.gestaoIAWpp.simulador;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -22,9 +21,10 @@ import app.gestaoIAWpp.atendimento.AtendimentoService;
 import app.gestaoIAWpp.carrinho.CarrinhoResumo;
 import app.gestaoIAWpp.carrinho.CarrinhoService;
 import app.gestaoIAWpp.carrinho.ItemCarrinhoResumo;
-import app.gestaoIAWpp.cliente.Cliente;
+import app.gestaoIAWpp.cliente.ClienteResumo;
 import app.gestaoIAWpp.cliente.ClienteService;
 import app.gestaoIAWpp.empresa.NumeroNaoCadastradoException;
+import app.gestaoIAWpp.empresa.NumeroWhatsappService;
 import app.gestaoIAWpp.produto.ProdutoService;
 import app.gestaoIAWpp.produto.VarianteResumo;
 import java.math.BigDecimal;
@@ -44,6 +44,7 @@ class SimuladorControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean AtendimentoService atendimento;
+    @MockitoBean NumeroWhatsappService numeros;
     @MockitoBean AgenteAtendimento agente;
     @MockitoBean CarrinhoService carrinho;
     @MockitoBean ProdutoService produtos;
@@ -103,9 +104,8 @@ class SimuladorControllerTest {
         UUID empresa = UUID.randomUUID();
         UUID clienteId = UUID.randomUUID();
         UUID varianteId = UUID.randomUUID();
-        Cliente cliente = mock(Cliente.class);
-        when(cliente.getId()).thenReturn(clienteId);
-        when(atendimento.empresaDoNumero("simulador-loja-demo")).thenReturn(empresa);
+        ClienteResumo cliente = new ClienteResumo(clienteId, "BR.SIM5511999990000", "5511999990000");
+        when(numeros.empresaDoNumero("simulador-loja-demo")).thenReturn(empresa);
         when(clientes.buscar(empresa, "BR.SIM5511999990000")).thenReturn(Optional.of(cliente));
         var item = new ItemCarrinhoResumo(varianteId, "Camisa Básica (Preta / M)", new BigDecimal("49.90"), 2);
         when(carrinho.ver(clienteId)).thenReturn(new CarrinhoResumo(List.of(item), new BigDecimal("99.80")));
@@ -128,7 +128,7 @@ class SimuladorControllerTest {
     @Test
     void getEstadoRetornaCarrinhoVazio_quandoClienteNaoExiste() throws Exception {
         UUID empresa = UUID.randomUUID();
-        when(atendimento.empresaDoNumero("simulador-loja-demo")).thenReturn(empresa);
+        when(numeros.empresaDoNumero("simulador-loja-demo")).thenReturn(empresa);
         when(clientes.buscar(empresa, "BR.SIM5511999990000")).thenReturn(Optional.empty());
         mvc.perform(get("/api/simulador/estado").param("telefone", "5511999990000"))
                 .andExpect(status().isOk())
@@ -151,7 +151,7 @@ class SimuladorControllerTest {
     @DisplayName("T27 reset limpa as conversas, reinicia os carrinhos da empresa da demo e devolve 204")
     void resetReiniciaConversasECarrinhosDaEmpresaERetorna204() throws Exception {
         UUID empresa = UUID.randomUUID();
-        when(atendimento.empresaDoNumero("simulador-loja-demo")).thenReturn(empresa);
+        when(numeros.empresaDoNumero("simulador-loja-demo")).thenReturn(empresa);
         mvc.perform(post("/api/simulador/reset")).andExpect(status().isNoContent());
         verify(agente).reiniciarConversas();
         verify(carrinho).reiniciarDemo(empresa);
@@ -170,7 +170,7 @@ class SimuladorControllerTest {
         mvc.perform(get("/api/simulador/estado").param("telefone", " "))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.erro").value("Telefone é obrigatório."));
-        verify(atendimento, never()).empresaDoNumero(anyString());
+        verify(numeros, never()).empresaDoNumero(anyString());
     }
 
     @Test

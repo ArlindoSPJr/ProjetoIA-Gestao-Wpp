@@ -16,14 +16,18 @@ public class ClienteService {
 
 	/** Insere o cliente se ainda não existe (atômico, sem corrida) e devolve o registro. */
 	@Transactional
-	public Cliente identificar(UUID empresaId, String userId, String telefone) {
+	public ClienteResumo identificar(UUID empresaId, String userId, String telefone) {
 		repository.inserirSeNaoExiste(empresaId, userId, telefone);
-		return repository.findByEmpresaIdAndUserId(empresaId, userId).orElseThrow();
+		return repository.findByEmpresaIdAndUserId(empresaId, userId).map(ClienteService::resumir).orElseThrow();
 	}
 
 	@Transactional(readOnly = true)
-	public Optional<Cliente> buscar(UUID empresaId, String userId) {
-		return repository.findByEmpresaIdAndUserId(empresaId, userId);
+	public Optional<ClienteResumo> buscar(UUID empresaId, String userId) {
+		return repository.findByEmpresaIdAndUserId(empresaId, userId).map(ClienteService::resumir);
+	}
+
+	private static ClienteResumo resumir(Cliente cliente) {
+		return new ClienteResumo(cliente.getId(), cliente.getUserId(), cliente.getTelefone());
 	}
 
 }

@@ -2,10 +2,9 @@ package app.gestaoIAWpp.atendimento;
 
 import app.gestaoIAWpp.ai.AgenteAtendimento;
 import app.gestaoIAWpp.ai.dto.AgenteResponse;
-import app.gestaoIAWpp.cliente.Cliente;
+import app.gestaoIAWpp.cliente.ClienteResumo;
 import app.gestaoIAWpp.cliente.ClienteService;
-import app.gestaoIAWpp.empresa.NumeroNaoCadastradoException;
-import app.gestaoIAWpp.empresa.NumeroWhatsappRepository;
+import app.gestaoIAWpp.empresa.NumeroWhatsappService;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -16,11 +15,11 @@ import org.springframework.stereotype.Service;
 @Service
 public class AtendimentoService {
 
-    private final NumeroWhatsappRepository numeros;
+    private final NumeroWhatsappService numeros;
     private final ClienteService clientes;
     private final AgenteAtendimento agente;
 
-    public AtendimentoService(NumeroWhatsappRepository numeros, ClienteService clientes, AgenteAtendimento agente) {
+    public AtendimentoService(NumeroWhatsappService numeros, ClienteService clientes, AgenteAtendimento agente) {
         this.numeros = numeros;
         this.clientes = clientes;
         this.agente = agente;
@@ -31,14 +30,8 @@ public class AtendimentoService {
         if (userId == null || userId.isBlank() || texto == null || texto.isBlank()) {
             throw new IllegalArgumentException("Telefone e texto são obrigatórios.");
         }
-        UUID empresaId = empresaDoNumero(phoneNumberId);
-        Cliente cliente = clientes.identificar(empresaId, userId, telefone);
-        return agente.responder(empresaId, cliente.getId(), texto.strip());
-    }
-
-    public UUID empresaDoNumero(String phoneNumberId) {
-        return numeros.findByPhoneNumberIdAndAtivoTrue(phoneNumberId)
-                .orElseThrow(NumeroNaoCadastradoException::new)
-                .getEmpresaId();
+        UUID empresaId = numeros.empresaDoNumero(phoneNumberId);
+        ClienteResumo cliente = clientes.identificar(empresaId, userId, telefone);
+        return agente.responder(empresaId, cliente.id(), texto.strip());
     }
 }

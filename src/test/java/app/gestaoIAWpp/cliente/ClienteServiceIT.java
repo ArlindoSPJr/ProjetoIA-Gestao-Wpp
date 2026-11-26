@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace.NONE;
 
 import app.gestaoIAWpp.TestcontainersConfiguration;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,12 +41,34 @@ class ClienteServiceIT {
 	void deveCriarEReaproveitarCliente_quandoIdentificaDuasVezes() {
 		UUID empresa = empresaDoSeed();
 
-		Cliente primeiro = service.identificar(empresa, USER_ID, "5511999990000");
-		Cliente segundo = service.identificar(empresa, USER_ID, "5511999990000");
+		ClienteResumo primeiro = service.identificar(empresa, USER_ID, "5511999990000");
+		ClienteResumo segundo = service.identificar(empresa, USER_ID, "5511999990000");
 
-		assertThat(segundo.getId()).isEqualTo(primeiro.getId());
+		assertThat(segundo.id()).isEqualTo(primeiro.id());
+		assertThat(segundo.userId()).isEqualTo(USER_ID);
+		assertThat(segundo.telefone()).isEqualTo("5511999990000");
+		assertThat(segundo).isEqualTo(primeiro);
 		assertThat(jdbc.queryForObject("SELECT count(*) FROM cliente WHERE user_id = ?", Integer.class, USER_ID))
 				.isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("RN11 buscar devolve o ClienteResumo de um cliente já identificado")
+	void deveDevolverResumoDoCliente_quandoBuscaClienteIdentificado() {
+		UUID empresa = empresaDoSeed();
+		ClienteResumo identificado = service.identificar(empresa, USER_ID, "5511999990000");
+
+		Optional<ClienteResumo> buscado = service.buscar(empresa, USER_ID);
+
+		assertThat(buscado).contains(identificado);
+		assertThat(buscado.get().userId()).isEqualTo(USER_ID);
+		assertThat(buscado.get().telefone()).isEqualTo("5511999990000");
+	}
+
+	@Test
+	@DisplayName("RN11 buscar devolve vazio quando o cliente não existe")
+	void deveDevolverVazio_quandoBuscaClienteInexistente() {
+		assertThat(service.buscar(empresaDoSeed(), "BR.SIM5500000000000")).isEmpty();
 	}
 
 	@ParameterizedTest
@@ -64,9 +87,9 @@ class ClienteServiceIT {
 	void deveAceitarTelefoneNoLimite_quandoInsereCliente(String telefone) {
 		UUID empresa = empresaDoSeed();
 
-		Cliente cliente = service.identificar(empresa, "u-" + telefone, telefone);
+		ClienteResumo cliente = service.identificar(empresa, "u-" + telefone, telefone);
 
-		assertThat(cliente.getTelefone()).isEqualTo(telefone);
+		assertThat(cliente.telefone()).isEqualTo(telefone);
 	}
 
 	@Test

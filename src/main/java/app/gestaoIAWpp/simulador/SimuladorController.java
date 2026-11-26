@@ -6,6 +6,7 @@ import app.gestaoIAWpp.atendimento.AtendimentoService;
 import app.gestaoIAWpp.carrinho.CarrinhoResumo;
 import app.gestaoIAWpp.carrinho.CarrinhoService;
 import app.gestaoIAWpp.cliente.ClienteService;
+import app.gestaoIAWpp.empresa.NumeroWhatsappService;
 import app.gestaoIAWpp.produto.ProdutoService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -33,15 +34,17 @@ public class SimuladorController {
 
     private final String phoneNumberId;
     private final AtendimentoService atendimento;
+    private final NumeroWhatsappService numeros;
     private final ClienteService clientes;
     private final AgenteAtendimento agente;
     private final CarrinhoService carrinho;
     private final ProdutoService produtos;
 
     public SimuladorController(@Value("${simulador.phone-number-id}") String phoneNumberId,
-            AtendimentoService atendimento, ClienteService clientes, AgenteAtendimento agente,
-            CarrinhoService carrinho, ProdutoService produtos) {
+            AtendimentoService atendimento, NumeroWhatsappService numeros, ClienteService clientes,
+            AgenteAtendimento agente, CarrinhoService carrinho, ProdutoService produtos) {
         this.phoneNumberId = phoneNumberId;
+        this.numeros = numeros;
         this.clientes = clientes;
         this.atendimento = atendimento;
         this.agente = agente;
@@ -62,12 +65,12 @@ public class SimuladorController {
         if (userId == null) {
             throw new IllegalArgumentException("Telefone é obrigatório.");
         }
-        UUID empresaId = atendimento.empresaDoNumero(phoneNumberId);
+        UUID empresaId = numeros.empresaDoNumero(phoneNumberId);
         List<ItemEstoqueView> itens = produtos.listarVariantes(empresaId).stream()
                 .map(v -> new ItemEstoqueView(v.varianteId(), v.nome(), v.preco(), v.quantidadeDisponivel()))
                 .toList();
         CarrinhoResumo resumo = clientes.buscar(empresaId, userId)
-                .map(c -> carrinho.ver(c.getId()))
+                .map(c -> carrinho.ver(c.id()))
                 .orElseGet(() -> new CarrinhoResumo(List.of(), new BigDecimal("0.00")));
         return new EstadoSimulador(resumo, itens);
     }
@@ -87,7 +90,7 @@ public class SimuladorController {
     @PostMapping("/reset")
     public ResponseEntity<Void> reset() {
         agente.reiniciarConversas();
-        carrinho.reiniciarDemo(atendimento.empresaDoNumero(phoneNumberId));
+        carrinho.reiniciarDemo(numeros.empresaDoNumero(phoneNumberId));
         return ResponseEntity.noContent().build();
     }
 
