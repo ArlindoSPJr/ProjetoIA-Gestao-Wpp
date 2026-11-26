@@ -1,7 +1,5 @@
 package app.gestaoIAWpp.ai;
 
-import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
-
 import java.util.ArrayList;
 import java.util.List;
 

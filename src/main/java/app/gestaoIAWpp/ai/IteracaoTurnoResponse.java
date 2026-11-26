@@ -1,4 +1,4 @@
-package app.gestaoIAWpp.ai.dto;
+package app.gestaoIAWpp.ai;
 
 import java.util.List;
 

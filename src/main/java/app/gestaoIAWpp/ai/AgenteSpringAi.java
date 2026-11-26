@@ -1,7 +1,5 @@
 package app.gestaoIAWpp.ai;
 
-import app.gestaoIAWpp.ai.dto.AgenteResponse;
-
 import com.anthropic.models.messages.OutputConfig;
 import java.io.IOException;
 import java.io.UncheckedIOException;

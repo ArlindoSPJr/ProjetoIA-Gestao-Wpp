@@ -14,9 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import app.gestaoIAWpp.ai.AgenteAtendimento;
-import app.gestaoIAWpp.ai.dto.IteracaoTurnoResponse;
-import app.gestaoIAWpp.ai.dto.AgenteResponse;
-import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
+import app.gestaoIAWpp.ai.IteracaoTurnoResponse;
+import app.gestaoIAWpp.ai.AgenteResponse;
+import app.gestaoIAWpp.ai.ToolPedidaResponse;
 import app.gestaoIAWpp.atendimento.AtendimentoService;
 import app.gestaoIAWpp.carrinho.CarrinhoResumo;
 import app.gestaoIAWpp.carrinho.CarrinhoService;

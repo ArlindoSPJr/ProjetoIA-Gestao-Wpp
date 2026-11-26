@@ -1,7 +1,7 @@
 package app.gestaoIAWpp.atendimento;
 
 import app.gestaoIAWpp.ai.AgenteAtendimento;
-import app.gestaoIAWpp.ai.dto.AgenteResponse;
+import app.gestaoIAWpp.ai.AgenteResponse;
 import app.gestaoIAWpp.cliente.ClienteResumo;
 import app.gestaoIAWpp.cliente.ClienteService;
 import app.gestaoIAWpp.empresa.NumeroWhatsappService;
