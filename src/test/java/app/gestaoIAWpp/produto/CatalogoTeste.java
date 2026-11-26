@@ -109,7 +109,7 @@ public final class CatalogoTeste {
     }
 
     /** {@code catalogoAtivo(empresaId)} devolve os produtos ativos deste catálogo. */
-    public ProdutoRepository produtoRepository() {
+    ProdutoRepository produtoRepository() {
         ProdutoRepository repo = mock(ProdutoRepository.class);
         when(repo.catalogoAtivo(empresaId)).thenReturn(produtos.stream().filter(Produto::isAtivo).toList());
         return repo;
@@ -120,7 +120,7 @@ public final class CatalogoTeste {
      * saldo (sem alterar a entidade); {@code devolverEstoque} afeta 1 linha; {@code findById} acha a variante;
      * {@code resumoDasVariantes} devolve as variantes do catálogo cujo id está na coleção, ativas ou não.
      */
-    public VarianteRepository varianteRepository() {
+    VarianteRepository varianteRepository() {
         VarianteRepository repo = mock(VarianteRepository.class);
         when(repo.daEmpresa(any(), any())).thenAnswer(inv -> daEmpresa(inv.getArgument(0), inv.getArgument(1)));
         when(repo.findById(any())).thenAnswer(inv -> porId(inv.getArgument(0)));

@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import app.gestaoIAWpp.carrinho.CarrinhoService;
@@ -15,7 +16,6 @@ import app.gestaoIAWpp.carrinho.CarrinhoTool;
 import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.ProdutoService;
 import app.gestaoIAWpp.produto.ProdutoTool;
-import app.gestaoIAWpp.produto.VarianteRepository;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +31,7 @@ class ToolsAgenteTest {
     private static final UUID EMPRESA = UUID.randomUUID();
     private static final UUID CLIENTE = UUID.randomUUID();
 
-    private VarianteRepository variantes;
+    private ProdutoService produtos;
     private CarrinhoService carrinho;
     private ToolRegistry registry;
     private CarrinhoTool carrinhoTool;
@@ -42,11 +42,11 @@ class ToolsAgenteTest {
     @BeforeEach
     void setUp() {
         var catalogo = CatalogoTeste.lojaDemo(EMPRESA);
-        variantes = catalogo.varianteRepository();
-        carrinho = new CarrinhoService(variantes, CarrinhoTeste.repositorio(variantes));
+        produtos = spy(catalogo.produtoService());
+        carrinho = CarrinhoTeste.servico(produtos);
         carrinhoTool = new CarrinhoTool(carrinho);
         registry = new ToolRegistry(List.of(
-                new ProdutoTool(new ProdutoService(catalogo.produtoRepository(), variantes)), carrinhoTool));
+                new ProdutoTool(produtos), carrinhoTool));
         ctx = new ToolContext(Map.of(CHAVE_EMPRESA_ID, EMPRESA, CHAVE_CLIENTE_ID, CLIENTE));
         pretaM = catalogo.variante("Camisa Básica (Preta / M)").getId();
         pretaMTexto = pretaM.toString();
@@ -63,7 +63,7 @@ class ToolsAgenteTest {
         carrinhoTool.adicionarAoCarrinho(pretaMTexto, 2, ctx);
         assertThat(carrinho.ver(CLIENTE).itens()).singleElement()
                 .satisfies(i -> assertThat(i.quantidade()).isEqualTo(2));
-        verify(variantes).baixarEstoque(pretaM, 2);
+        verify(produtos).baixarEstoque(pretaM, 2);
     }
 
     @Test
@@ -71,7 +71,7 @@ class ToolsAgenteTest {
         carrinhoTool.adicionarAoCarrinho(pretaMTexto, 2, ctx);
         carrinhoTool.removerDoCarrinho(pretaMTexto, null, ctx);
         assertThat(carrinho.ver(CLIENTE).itens()).isEmpty();
-        verify(variantes).devolverEstoque(pretaM, 2);
+        verify(produtos).devolverEstoque(pretaM, 2);
     }
 
     @Test
@@ -79,7 +79,7 @@ class ToolsAgenteTest {
         assertThatThrownBy(() -> carrinhoTool.adicionarAoCarrinho(pretaMTexto, 0, ctx))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Quantidade deve ser maior que zero.");
-        verify(variantes, never()).baixarEstoque(any(), anyInt());
+        verify(produtos, never()).baixarEstoque(any(), anyInt());
     }
 
     @Test
@@ -87,7 +87,7 @@ class ToolsAgenteTest {
         assertThatThrownBy(() -> carrinhoTool.adicionarAoCarrinho(pretaMTexto, null, ctx))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Parâmetro obrigatório ausente: quantidade.");
-        verify(variantes, never()).baixarEstoque(any(), anyInt());
+        verify(produtos, never()).baixarEstoque(any(), anyInt());
     }
 
     @Test
@@ -96,7 +96,7 @@ class ToolsAgenteTest {
         assertThatThrownBy(() -> carrinhoTool.adicionarAoCarrinho(pretaMTexto, 1, semCliente))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cliente ausente");
-        verify(variantes, never()).baixarEstoque(any(), anyInt());
+        verify(produtos, never()).baixarEstoque(any(), anyInt());
     }
 
     @Test
@@ -104,6 +104,6 @@ class ToolsAgenteTest {
         assertThatThrownBy(() -> callback("adicionar_ao_carrinho")
                 .call("{\"varianteId\":\"" + pretaMTexto + "\",\"quantidade\":\"dois\"}", ctx))
                 .isInstanceOf(ToolExecutionException.class);
-        verify(variantes, never()).baixarEstoque(any(), anyInt());
+        verify(produtos, never()).baixarEstoque(any(), anyInt());
     }
 }
