@@ -16,7 +16,7 @@ import java.util.UUID;
 /** Uma dimensão de variação do produto (ex.: Cor), com seus valores possíveis. */
 @Entity
 @Table(name = "opcao")
-public class Opcao {
+class Opcao {
 
     @Id
     private UUID id;

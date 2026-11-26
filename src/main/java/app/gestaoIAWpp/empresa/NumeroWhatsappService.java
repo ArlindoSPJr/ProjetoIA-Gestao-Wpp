@@ -10,7 +10,7 @@ public class NumeroWhatsappService {
 
 	private final NumeroWhatsappRepository numeros;
 
-	public NumeroWhatsappService(NumeroWhatsappRepository numeros) {
+	NumeroWhatsappService(NumeroWhatsappRepository numeros) {
 		this.numeros = numeros;
 	}
 

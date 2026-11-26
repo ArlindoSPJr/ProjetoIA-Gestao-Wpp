@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface CarrinhoRepository extends JpaRepository<Carrinho, UUID> {
+interface CarrinhoRepository extends JpaRepository<Carrinho, UUID> {
 
     /**
      * RN04: cria o carrinho ABERTO do cliente se ainda não existe. O índice único parcial resolve a

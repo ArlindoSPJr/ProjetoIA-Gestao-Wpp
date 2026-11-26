@@ -13,7 +13,7 @@ import java.util.UUID;
 /** Uma variante no carrinho. Não guarda preço: o resumo usa o preço atual da variante (RN08). */
 @Entity
 @Table(name = "item_carrinho")
-public class ItemCarrinho {
+class ItemCarrinho {
 
     @Id
     private UUID id;

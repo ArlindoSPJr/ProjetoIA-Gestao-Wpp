@@ -47,7 +47,7 @@ class ToolsAgenteTest {
         registry = new ToolRegistry(List.of(
                 new ProdutoTool(produtos), carrinhoTool));
         ctx = new ToolContext(Map.of(CHAVE_EMPRESA_ID, EMPRESA, CHAVE_CLIENTE_ID, CLIENTE));
-        pretaM = catalogo.variante("Camisa Básica (Preta / M)").getId();
+        pretaM = catalogo.idDaVariante("Camisa Básica (Preta / M)");
         pretaMTexto = pretaM.toString();
     }
 

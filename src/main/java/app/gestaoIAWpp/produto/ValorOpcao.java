@@ -12,7 +12,7 @@ import java.util.UUID;
 /** Um valor de uma opção (ex.: Preta, da opção Cor). */
 @Entity
 @Table(name = "valor_opcao")
-public class ValorOpcao {
+class ValorOpcao {
 
     @Id
     private UUID id;

@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface ProdutoRepository extends JpaRepository<Produto, UUID> {
+interface ProdutoRepository extends JpaRepository<Produto, UUID> {
 
     /**
      * Produtos ativos da empresa com opções, variantes, valores e a opção de cada valor carregados numa

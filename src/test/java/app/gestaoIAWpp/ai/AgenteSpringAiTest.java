@@ -59,7 +59,7 @@ class AgenteSpringAiTest {
         when(chatModel.getOptions()).thenReturn(AnthropicChatOptions.builder().build());
         var catalogo = CatalogoTeste.lojaDemo(EMPRESA);
         produtos = spy(catalogo.produtoService());
-        pretaM = catalogo.variante("Camisa Básica (Preta / M)").getId().toString();
+        pretaM = catalogo.idDaVariante("Camisa Básica (Preta / M)").toString();
         var carrinho = CarrinhoTeste.servico(produtos);
         var tools = new ToolRegistry(List.of(new ProdutoTool(produtos), new CarrinhoTool(carrinho)));
         agente = new AgenteSpringAi(ChatClient.builder(chatModel),

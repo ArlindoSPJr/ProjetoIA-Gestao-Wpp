@@ -41,7 +41,7 @@ public class ProdutoService {
     private final ProdutoRepository produtos;
     private final VarianteRepository variantes;
 
-    public ProdutoService(ProdutoRepository produtos, VarianteRepository variantes) {
+    ProdutoService(ProdutoRepository produtos, VarianteRepository variantes) {
         this.produtos = produtos;
         this.variantes = variantes;
     }
@@ -90,7 +90,7 @@ public class ProdutoService {
                 .toList();
     }
 
-    public Variante varianteDaEmpresa(UUID empresaId, UUID varianteId) {
+    Variante varianteDaEmpresa(UUID empresaId, UUID varianteId) {
         return variantes.daEmpresa(varianteId, empresaId)
                 .orElseThrow(() -> new VarianteNaoEncontradaException(varianteId.toString()));
     }
