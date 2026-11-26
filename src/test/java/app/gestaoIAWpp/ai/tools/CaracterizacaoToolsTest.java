@@ -1,14 +1,13 @@
-package app.gestaoIAWpp.ai;
+package app.gestaoIAWpp.ai.tools;
 
 import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_CLIENTE_ID;
 import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_EMPRESA_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import app.gestaoIAWpp.ai.ToolRegistry;
 import app.gestaoIAWpp.carrinho.CarrinhoTeste;
-import app.gestaoIAWpp.carrinho.CarrinhoTool;
 import app.gestaoIAWpp.produto.CatalogoTeste;
-import app.gestaoIAWpp.produto.ProdutoTool;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;

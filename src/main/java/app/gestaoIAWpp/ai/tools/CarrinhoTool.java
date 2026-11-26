@@ -1,10 +1,11 @@
-package app.gestaoIAWpp.carrinho;
+package app.gestaoIAWpp.ai.tools;
 
 import app.gestaoIAWpp.ai.AgentTool;
 import app.gestaoIAWpp.ai.ContextoTool;
-import app.gestaoIAWpp.carrinho.dto.CarrinhoResponse;
-import app.gestaoIAWpp.carrinho.dto.ItemCarrinhoResponse;
-import app.gestaoIAWpp.produto.ProdutoTool;
+import app.gestaoIAWpp.ai.tools.dto.CarrinhoResponse;
+import app.gestaoIAWpp.ai.tools.dto.ItemCarrinhoResponse;
+import app.gestaoIAWpp.carrinho.CarrinhoResumo;
+import app.gestaoIAWpp.carrinho.CarrinhoService;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;

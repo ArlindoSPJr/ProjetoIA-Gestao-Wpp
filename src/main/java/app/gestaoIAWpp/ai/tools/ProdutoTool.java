@@ -1,11 +1,15 @@
-package app.gestaoIAWpp.produto;
+package app.gestaoIAWpp.ai.tools;
 
 import app.gestaoIAWpp.ai.AgentTool;
 import app.gestaoIAWpp.ai.ContextoTool;
-import app.gestaoIAWpp.produto.dto.ConsultarEstoqueResponse;
-import app.gestaoIAWpp.produto.dto.ConsultarProdutoResponse;
-import app.gestaoIAWpp.produto.dto.ProdutoResponse;
-import app.gestaoIAWpp.produto.dto.VarianteResponse;
+import app.gestaoIAWpp.ai.tools.dto.ConsultarEstoqueResponse;
+import app.gestaoIAWpp.ai.tools.dto.ConsultarProdutoResponse;
+import app.gestaoIAWpp.ai.tools.dto.ProdutoResponse;
+import app.gestaoIAWpp.ai.tools.dto.VarianteResponse;
+import app.gestaoIAWpp.produto.DisponibilidadeVariante;
+import app.gestaoIAWpp.produto.ProdutoService;
+import app.gestaoIAWpp.produto.ResultadoBusca;
+import app.gestaoIAWpp.produto.VarianteNaoEncontradaException;
 import java.util.UUID;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;

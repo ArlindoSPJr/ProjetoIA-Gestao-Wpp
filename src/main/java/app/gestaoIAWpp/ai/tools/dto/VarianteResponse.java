@@ -1,4 +1,4 @@
-package app.gestaoIAWpp.produto.dto;
+package app.gestaoIAWpp.ai.tools.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;

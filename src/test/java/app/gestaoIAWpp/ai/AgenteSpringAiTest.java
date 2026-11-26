@@ -1,9 +1,5 @@
 package app.gestaoIAWpp.ai;
 
-import app.gestaoIAWpp.ai.dto.AgenteResponse;
-import app.gestaoIAWpp.ai.dto.IteracaoTurnoResponse;
-import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -15,11 +11,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import app.gestaoIAWpp.ai.tools.CarrinhoTool;
+import app.gestaoIAWpp.ai.tools.ProdutoTool;
 import app.gestaoIAWpp.carrinho.CarrinhoTeste;
-import app.gestaoIAWpp.carrinho.CarrinhoTool;
 import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.ProdutoService;
-import app.gestaoIAWpp.produto.ProdutoTool;
 import com.anthropic.models.messages.OutputConfig;
 import java.util.ArrayList;
 import java.util.List;

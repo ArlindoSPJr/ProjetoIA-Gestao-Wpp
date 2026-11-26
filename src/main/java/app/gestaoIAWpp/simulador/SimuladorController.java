@@ -1,7 +1,7 @@
 package app.gestaoIAWpp.simulador;
 
 import app.gestaoIAWpp.ai.AgenteAtendimento;
-import app.gestaoIAWpp.ai.dto.AgenteResponse;
+import app.gestaoIAWpp.ai.AgenteResponse;
 import app.gestaoIAWpp.atendimento.AtendimentoService;
 import app.gestaoIAWpp.carrinho.CarrinhoResumo;
 import app.gestaoIAWpp.carrinho.CarrinhoService;

@@ -1,8 +1,5 @@
 package app.gestaoIAWpp.ai;
 
-import app.gestaoIAWpp.ai.dto.IteracaoTurnoResponse;
-import app.gestaoIAWpp.ai.dto.ToolPedidaResponse;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
