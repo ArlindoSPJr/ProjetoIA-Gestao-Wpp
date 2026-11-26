@@ -197,7 +197,7 @@ Passos, na ordem:
    Testes a partir das linhas da matriz deste ticket, seguindo .claude/rules/testing.md.
 3. Depois de CADA tarefa, meça as linhas de lógica (some só a 1ª coluna, a de linhas adicionadas):
    git diff --numstat origin/main...HEAD -- src/main/java
-   Se a soma, mais o que falta escrever, passar de ~700: pare num ponto coerente (tarefa
+   Se a soma passar de ~700: pare num ponto coerente (tarefa
    concluída, testes verdes) e avise o coordenador por ask, dizendo o que ainda não foi escrito.
    Esse resto vai para a sub-issue nova. Nunca remova nem comprima código para caber.
 4. Rode ./mvnw clean verify e ./mvnw test-compile org.pitest:pitest-maven:mutationCoverage.

@@ -57,7 +57,7 @@ Você é um revisor independente. Você **não** escreveu este código e não sa
    - Cada classe tem a responsabilidade descrita, na camada indicada?
 8. **Confira o ticket (se houver).**
    - **Previsto × realizado:** compare a seção "Alterações previstas" do ticket com as classes e métodos do diff e liste cada desvio. Desvio que não muda comportamento (outra classe, método auxiliar) = MENOR. Comportamento fora dos CA do ticket = IMPORTANTE. Não procure justificativa: ela fica no PR, fora do seu alcance.
-   - **Tamanho:** some a 1ª coluna (linhas adicionadas) de `git diff --numstat origin/main...HEAD -- src/main/java`. Código visivelmente comprimido ou removido para caber no limite (várias instruções por linha, validação ou tratamento de erro cortado) = IMPORTANTE.
+   - **Tamanho:** some a 1ª coluna (linhas adicionadas) de `git diff --numstat origin/main...HEAD -- src/main/java`. Acima de ~700 linhas sem divisão do ticket = IMPORTANTE (RN10 da dev-flow). Código visivelmente comprimido ou removido para caber no limite (várias instruções por linha, validação ou tratamento de erro cortado) = IMPORTANTE.
 9. **Confirme antes de reportar.** Cada achado precisa de um cenário concreto que quebra.
 
 ## Severidade
