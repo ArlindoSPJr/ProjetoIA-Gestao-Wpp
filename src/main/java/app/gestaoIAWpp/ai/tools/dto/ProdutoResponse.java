@@ -1,4 +1,4 @@
-package app.gestaoIAWpp.produto.dto;
+package app.gestaoIAWpp.ai.tools.dto;
 
 import java.util.List;
 import java.util.UUID;

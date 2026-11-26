@@ -1,4 +1,4 @@
-package app.gestaoIAWpp.ai;
+package app.gestaoIAWpp.ai.tools;
 
 import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_CLIENTE_ID;
 import static app.gestaoIAWpp.ai.ContextoTool.CHAVE_EMPRESA_ID;
@@ -10,12 +10,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import app.gestaoIAWpp.ai.ToolRegistry;
 import app.gestaoIAWpp.carrinho.CarrinhoService;
 import app.gestaoIAWpp.carrinho.CarrinhoTeste;
-import app.gestaoIAWpp.carrinho.CarrinhoTool;
 import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.ProdutoService;
-import app.gestaoIAWpp.produto.ProdutoTool;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
