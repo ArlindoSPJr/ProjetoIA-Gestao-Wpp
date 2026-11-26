@@ -116,4 +116,21 @@ class VarianteRepositoryIT {
 		assertThat(variantes.daEmpresa(id, outraEmpresa)).isEmpty();
 	}
 
+	@Test
+	@DisplayName("M08 resumo em lote inclui variante inativa e omite id inexistente, com nome completo carregado")
+	void deveIncluirInativaEOmitirInexistente_quandoResumoEmLote() {
+		UUID ativa = camisaPretaM();
+		UUID inativa = jdbc.queryForObject("""
+				SELECT v.id FROM variante v
+				JOIN produto p ON p.id = v.produto_id
+				WHERE p.nome = 'Camisa Básica' AND v.id <> ? LIMIT 1
+				""", UUID.class, ativa);
+		jdbc.update("UPDATE variante SET ativo = false WHERE id = ?", inativa);
+
+		List<Variante> resumo = variantes.resumoDasVariantes(List.of(ativa, inativa, UUID.randomUUID()));
+
+		assertThat(resumo).extracting(Variante::getId).containsExactlyInAnyOrder(ativa, inativa);
+		assertThat(resumo).allSatisfy(v -> assertThat(v.nomeCompleto()).startsWith("Camisa Básica ("));
+	}
+
 }

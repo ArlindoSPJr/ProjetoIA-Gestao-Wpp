@@ -4,16 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.VarianteNaoEncontradaException;
-import app.gestaoIAWpp.produto.VarianteRepository;
+import app.gestaoIAWpp.produto.ProdutoService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +32,7 @@ class CarrinhoServiceTest {
     private static final UUID EMPRESA = UUID.randomUUID();
     private static final UUID CLIENTE = UUID.randomUUID();
 
-    private VarianteRepository variantes;
+    private ProdutoService produtos;
     private CarrinhoRepository carrinhos;
     private CarrinhoService carrinho;
     private UUID pretaM;
@@ -38,9 +41,9 @@ class CarrinhoServiceTest {
     @BeforeEach
     void setUp() {
         var catalogo = CatalogoTeste.lojaDemo(EMPRESA);
-        variantes = catalogo.varianteRepository();
-        carrinhos = CarrinhoTeste.repositorio(variantes);
-        carrinho = new CarrinhoService(variantes, carrinhos);
+        produtos = spy(catalogo.produtoService());
+        carrinhos = CarrinhoTeste.repositorio();
+        carrinho = new CarrinhoService(produtos, carrinhos);
         pretaM = catalogo.variante("Camisa Básica (Preta / M)").getId();
         brancaM = catalogo.variante("Camisa Básica (Branca / M)").getId();
     }
@@ -54,7 +57,7 @@ class CarrinhoServiceTest {
 
         assertThat(r.itens()).singleElement().satisfies(i -> assertThat(i.quantidade()).isEqualTo(2));
         assertThat(r.total()).isEqualTo(new BigDecimal("99.80"));
-        verify(variantes).devolverEstoque(pretaM, 1);
+        verify(produtos).devolverEstoque(pretaM, 1);
     }
 
     @Test
@@ -63,7 +66,7 @@ class CarrinhoServiceTest {
         carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 3);
 
         assertThat(carrinho.remover(EMPRESA, CLIENTE, pretaM, 3).itens()).isEmpty();
-        verify(variantes).devolverEstoque(pretaM, 3);
+        verify(produtos).devolverEstoque(pretaM, 3);
     }
 
     @Test
@@ -75,7 +78,7 @@ class CarrinhoServiceTest {
         CarrinhoResumo r = carrinho.remover(EMPRESA, CLIENTE, pretaM, null);
 
         assertThat(r.itens()).extracting(ItemCarrinhoResumo::varianteId).containsExactly(brancaM);
-        verify(variantes).devolverEstoque(pretaM, 3);
+        verify(produtos).devolverEstoque(pretaM, 3);
     }
 
     @Test
@@ -84,7 +87,7 @@ class CarrinhoServiceTest {
         assertThatThrownBy(() -> carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Quantidade deve ser maior que zero.");
-        verifyNoInteractions(variantes, carrinhos);
+        verifyNoInteractions(produtos, carrinhos);
     }
 
     @Test
@@ -93,7 +96,7 @@ class CarrinhoServiceTest {
         assertThatThrownBy(() -> carrinho.remover(EMPRESA, CLIENTE, pretaM, 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Quantidade deve ser maior que zero.");
-        verifyNoInteractions(variantes, carrinhos);
+        verifyNoInteractions(produtos, carrinhos);
     }
 
     @Test
@@ -104,7 +107,7 @@ class CarrinhoServiceTest {
         assertThat(r.itens()).containsExactly(
                 new ItemCarrinhoResumo(pretaM, "Camisa Básica (Preta / M)", new BigDecimal("49.90"), 1));
         assertThat(r.total()).isEqualTo(new BigDecimal("49.90"));
-        verify(variantes).baixarEstoque(pretaM, 1);
+        verify(produtos).baixarEstoque(pretaM, 1);
     }
 
     @Test
@@ -113,7 +116,7 @@ class CarrinhoServiceTest {
         carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 1);
 
         assertThat(carrinho.remover(EMPRESA, CLIENTE, pretaM, 1).itens()).isEmpty();
-        verify(variantes).devolverEstoque(pretaM, 1);
+        verify(produtos).devolverEstoque(pretaM, 1);
     }
 
     @Test
@@ -124,7 +127,7 @@ class CarrinhoServiceTest {
         assertThatThrownBy(() -> carrinho.remover(EMPRESA, CLIENTE, brancaM, 1))
                 .isInstanceOf(ItemNaoEstaNoCarrinhoException.class)
                 .hasMessage("Variante " + brancaM + " não está no carrinho.");
-        verify(variantes, never()).devolverEstoque(any(), anyInt());
+        verify(produtos, never()).devolverEstoque(any(), anyInt());
     }
 
     @Test
@@ -142,7 +145,7 @@ class CarrinhoServiceTest {
         assertThatThrownBy(() -> carrinho.remover(EMPRESA, CLIENTE, pretaM, null))
                 .isInstanceOf(ItemNaoEstaNoCarrinhoException.class)
                 .hasMessage("Variante " + pretaM + " não está no carrinho.");
-        verify(variantes, never()).devolverEstoque(any(), anyInt());
+        verify(produtos, never()).devolverEstoque(any(), anyInt());
     }
 
     @Test
@@ -152,7 +155,7 @@ class CarrinhoServiceTest {
 
         assertThatThrownBy(() -> carrinho.remover(UUID.randomUUID(), CLIENTE, pretaM, null))
                 .isInstanceOf(ItemNaoEstaNoCarrinhoException.class);
-        verify(variantes, never()).devolverEstoque(any(), anyInt());
+        verify(produtos, never()).devolverEstoque(any(), anyInt());
     }
 
     @Test
@@ -163,9 +166,10 @@ class CarrinhoServiceTest {
         assertThatThrownBy(() -> carrinho.adicionar(EMPRESA, CLIENTE, inexistente, 1))
                 .isInstanceOf(VarianteNaoEncontradaException.class)
                 .hasMessage("Variante " + inexistente + " não encontrada.");
-        verify(variantes, never()).baixarEstoque(any(), anyInt());
+        verify(produtos, never()).baixarEstoque(any(), anyInt());
         verifyNoInteractions(carrinhos);
     }
+
     @Test
     @DisplayName("RN14 reset apaga o carrinho logo depois de criado: adicionar cria de novo e grava o item")
     void deveRecriarCarrinhoEGravarItem_quandoResetApagaCarrinhoRecemCriado() {
@@ -183,5 +187,16 @@ class CarrinhoServiceTest {
 
         assertThat(r.itens()).singleElement().satisfies(i -> assertThat(i.quantidade()).isEqualTo(2));
         assertThat(carrinho.ver(CLIENTE)).isEqualTo(r);
+    }
+
+    @Test
+    @DisplayName("M10 RN09 item cuja variante não volta do resumo: IllegalStateException com o id")
+    void deveLancarIllegalState_quandoVarianteDoItemNaoVoltaDoResumo() {
+        carrinho.adicionar(EMPRESA, CLIENTE, pretaM, 1);
+        doReturn(Map.of()).when(produtos).resumirVariantes(any());
+
+        assertThatThrownBy(() -> carrinho.ver(CLIENTE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Variante " + pretaM + " do carrinho não existe.");
     }
 }

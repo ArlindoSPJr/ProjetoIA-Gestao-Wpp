@@ -2,8 +2,10 @@ package app.gestaoIAWpp.produto;
 
 import java.text.Normalizer;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -91,6 +93,37 @@ public class ProdutoService {
     public Variante varianteDaEmpresa(UUID empresaId, UUID varianteId) {
         return variantes.daEmpresa(varianteId, empresaId)
                 .orElseThrow(() -> new VarianteNaoEncontradaException(varianteId.toString()));
+    }
+
+    /**
+     * RN06: baixa atômica do estoque. Sem saldo, o nome e o saldo da exceção são lidos depois da falha.
+     * Participa da transação do chamador (o carrinho grava o item na mesma transação).
+     */
+    @Transactional
+    public void baixarEstoque(UUID varianteId, int quantidade) {
+        if (variantes.baixarEstoque(varianteId, quantidade) == 0) {
+            Variante v = variantes.findById(varianteId)
+                    .orElseThrow(() -> new VarianteNaoEncontradaException(varianteId.toString()));
+            throw new EstoqueInsuficienteException(varianteId, v.nomeCompleto(), quantidade, v.getQuantidadeEstoque());
+        }
+    }
+
+    /** RN07: devolve o estoque de forma atômica. */
+    @Transactional
+    public void devolverEstoque(UUID varianteId, int quantidade) {
+        variantes.devolverEstoque(varianteId, quantidade);
+    }
+
+    /**
+     * RN08: resumo das variantes pelo id, com o preço atual, incluindo as desativadas depois de entrar no carrinho.
+     * Ids inexistentes ficam fora do mapa.
+     */
+    public Map<UUID, VarianteResumo> resumirVariantes(Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return variantes.resumoDasVariantes(ids).stream()
+                .collect(Collectors.toMap(Variante::getId, VarianteResumo::de));
     }
 
     private static List<Variante> variantesAtivas(Produto p) {

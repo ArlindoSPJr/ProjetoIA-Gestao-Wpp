@@ -1,11 +1,10 @@
 package app.gestaoIAWpp.carrinho;
 
-import app.gestaoIAWpp.produto.EstoqueInsuficienteException;
-import app.gestaoIAWpp.produto.Variante;
-import app.gestaoIAWpp.produto.VarianteNaoEncontradaException;
-import app.gestaoIAWpp.produto.VarianteRepository;
+import app.gestaoIAWpp.produto.ProdutoService;
+import app.gestaoIAWpp.produto.VarianteResumo;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -15,9 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
  * Carrinho no banco, um ABERTO por cliente. Cada operação que escreve roda numa única transação:
  * estoque e carrinho mudam juntos ou nada muda (RN02).
  *
- * <p>As queries nativas de escrita ({@code baixarEstoque}, {@code devolverEstoque}, {@code somarItem})
- * limpam o contexto de persistência ao terminar. Por isso o resumo é sempre montado com o carrinho
- * lido de novo depois delas: entidades carregadas antes ficam destacadas e com estoque antigo.
+ * <p>O estoque e os dados da variante vêm do {@link ProdutoService}; o carrinho guarda só o id da
+ * variante. As queries nativas de escrita ({@code baixarEstoque} e {@code devolverEstoque}, no
+ * {@code produto}, e {@code somarItem}) limpam o contexto de persistência ao terminar. Por isso o
+ * resumo é sempre montado com o carrinho lido de novo depois delas: entidades carregadas antes ficam
+ * destacadas.
  *
  * <p>Concorrência: quem mexe nos itens ({@code adicionar}, {@code remover}) e o reset travam o carrinho
  * ({@code SELECT ... FOR UPDATE}) antes de ler ou alterar itens, então não se intercalam no mesmo
@@ -29,11 +30,11 @@ public class CarrinhoService {
     private static final String QUANTIDADE_INVALIDA = "Quantidade deve ser maior que zero.";
     private static final CarrinhoResumo VAZIO = new CarrinhoResumo(List.of(), BigDecimal.ZERO.setScale(2));
 
-    private final VarianteRepository variantes;
+    private final ProdutoService produtos;
     private final CarrinhoRepository carrinhos;
 
-    public CarrinhoService(VarianteRepository variantes, CarrinhoRepository carrinhos) {
-        this.variantes = variantes;
+    public CarrinhoService(ProdutoService produtos, CarrinhoRepository carrinhos) {
+        this.produtos = produtos;
         this.carrinhos = carrinhos;
     }
 
@@ -42,15 +43,11 @@ public class CarrinhoService {
         if (quantidade < 1) {
             throw new IllegalArgumentException(QUANTIDADE_INVALIDA);
         }
-        Variante variante = variantes.daEmpresa(varianteId, empresaId)
-                .orElseThrow(() -> new VarianteNaoEncontradaException(varianteId.toString()));
-        String nome = variante.nomeCompleto();
+        // Só valida que a variante existe, está ativa e é da empresa; falha com VarianteNaoEncontradaException.
+        produtos.consultarDisponibilidade(empresaId, varianteId);
         // Trava o carrinho que já existe antes de baixar o estoque (ordem carrinho, depois variante).
         Optional<Carrinho> existente = carrinhoAbertoTravado(empresaId, clienteId);
-        if (variantes.baixarEstoque(varianteId, quantidade) == 0) {
-            int disponivel = variantes.findById(varianteId).map(Variante::getQuantidadeEstoque).orElse(0);
-            throw new EstoqueInsuficienteException(varianteId, nome, quantidade, disponivel);
-        }
+        produtos.baixarEstoque(varianteId, quantidade);
         // Sem carrinho, só cria depois de saber que há estoque: assim a falha não deixa carrinho vazio.
         Carrinho carrinho = existente.orElseGet(() -> criarETravar(empresaId, clienteId));
         carrinhos.somarItem(carrinho.getId(), varianteId, quantidade);
@@ -73,15 +70,15 @@ public class CarrinhoService {
         } else {
             item.diminuir(removida);
         }
-        // flushAutomatically grava a mudança do item antes do UPDATE do estoque; depois o contexto é limpo.
-        variantes.devolverEstoque(varianteId, removida);
+        // O UPDATE do estoque (flushAutomatically, no produto) grava a mudança do item antes; depois o contexto é limpo.
+        produtos.devolverEstoque(varianteId, removida);
         return resumoDoAberto(empresaId, clienteId);
     }
 
     @Transactional(readOnly = true)
     public CarrinhoResumo ver(UUID clienteId) {
         return carrinhos.findByClienteIdAndStatus(clienteId, StatusCarrinho.ABERTO)
-                .map(CarrinhoService::resumir)
+                .map(this::resumir)
                 .orElse(VAZIO);
     }
 
@@ -97,10 +94,10 @@ public class CarrinhoService {
         List<Carrinho> abertos = carrinhos.travarDaEmpresa(empresaId, StatusCarrinho.ABERTO);
         List<Devolucao> devolucoes = abertos.stream()
                 .flatMap(c -> c.getItens().stream())
-                .map(i -> new Devolucao(i.getVariante().getId(), i.getQuantidade()))
+                .map(i -> new Devolucao(i.getVarianteId(), i.getQuantidade()))
                 .toList();
         List<UUID> ids = abertos.stream().map(Carrinho::getId).toList();
-        devolucoes.forEach(d -> variantes.devolverEstoque(d.varianteId(), d.quantidade()));
+        devolucoes.forEach(d -> produtos.devolverEstoque(d.varianteId(), d.quantidade()));
         carrinhos.deleteAllByIdInBatch(ids);
     }
 
@@ -129,14 +126,24 @@ public class CarrinhoService {
     }
 
     private CarrinhoResumo resumoDoAberto(UUID empresaId, UUID clienteId) {
-        return carrinhoAberto(empresaId, clienteId).map(CarrinhoService::resumir).orElse(VAZIO);
+        return carrinhoAberto(empresaId, clienteId).map(this::resumir).orElse(VAZIO);
     }
 
-    /** RN08: preço atual da variante, lido agora; o item não guarda preço. */
-    private static CarrinhoResumo resumir(Carrinho carrinho) {
+    /**
+     * RN08: preço atual da variante, lido agora no {@code produto}; o item não guarda preço. RN09: item
+     * cuja variante não volta do resumo é estado inconsistente.
+     */
+    private CarrinhoResumo resumir(Carrinho carrinho) {
+        List<UUID> ids = carrinho.getItens().stream().map(ItemCarrinho::getVarianteId).toList();
+        Map<UUID, VarianteResumo> variantes = produtos.resumirVariantes(ids);
         List<ItemCarrinhoResumo> itens = carrinho.getItens().stream()
-                .map(i -> new ItemCarrinhoResumo(i.getVariante().getId(), i.getVariante().nomeCompleto(),
-                        i.getVariante().getPreco(), i.getQuantidade()))
+                .map(i -> {
+                    VarianteResumo v = variantes.get(i.getVarianteId());
+                    if (v == null) {
+                        throw new IllegalStateException("Variante " + i.getVarianteId() + " do carrinho não existe.");
+                    }
+                    return new ItemCarrinhoResumo(i.getVarianteId(), v.nome(), v.preco(), i.getQuantidade());
+                })
                 .toList();
         BigDecimal total = itens.stream()
                 .map(ItemCarrinhoResumo::subtotal)

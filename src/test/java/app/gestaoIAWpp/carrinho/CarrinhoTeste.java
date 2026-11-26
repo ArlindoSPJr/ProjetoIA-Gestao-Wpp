@@ -6,7 +6,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import app.gestaoIAWpp.produto.VarianteRepository;
+import app.gestaoIAWpp.produto.ProdutoService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -15,19 +15,22 @@ import java.util.UUID;
 /**
  * {@link CarrinhoRepository} mockado com estado em memória, para os testes unitários (sem banco).
  * Imita o que o SQL faz: um carrinho ABERTO por cliente, upsert que soma a quantidade do item e
- * exclusão em lote. As variantes dos itens vêm do {@code findById} do {@link VarianteRepository} dado.
+ * exclusão em lote. Os itens guardam só o id da variante, então o repositório não precisa conhecer o catálogo.
  */
 public final class CarrinhoTeste {
 
     private final List<Carrinho> carrinhos = new ArrayList<>();
-    private final VarianteRepository variantes;
 
-    private CarrinhoTeste(VarianteRepository variantes) {
-        this.variantes = variantes;
+    private CarrinhoTeste() {
     }
 
-    public static CarrinhoRepository repositorio(VarianteRepository variantes) {
-        return new CarrinhoTeste(variantes).criarMock();
+    /** O {@link CarrinhoService} sobre um repositório em memória novo, com o {@link ProdutoService} dado. */
+    public static CarrinhoService servico(ProdutoService produtos) {
+        return new CarrinhoService(produtos, repositorio());
+    }
+
+    static CarrinhoRepository repositorio() {
+        return new CarrinhoTeste().criarMock();
     }
 
     private CarrinhoRepository criarMock() {
@@ -74,8 +77,7 @@ public final class CarrinhoTeste {
         if (item.isPresent()) {
             item.get().somar(quantidade);
         } else {
-            carrinho.incluir(new ItemCarrinho(UUID.randomUUID(), carrinho,
-                    variantes.findById(varianteId).orElseThrow(), quantidade));
+            carrinho.incluir(new ItemCarrinho(UUID.randomUUID(), carrinho, varianteId, quantidade));
         }
         return 1;
     }
