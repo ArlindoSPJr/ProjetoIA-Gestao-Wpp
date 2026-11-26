@@ -1,6 +1,5 @@
 package app.gestaoIAWpp.carrinho;
 
-import app.gestaoIAWpp.produto.Variante;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -23,9 +22,8 @@ public class ItemCarrinho {
     @JoinColumn(name = "carrinho_id", nullable = false)
     private Carrinho carrinho;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "variante_id", nullable = false)
-    private Variante variante;
+    @Column(name = "variante_id", nullable = false)
+    private UUID varianteId;
 
     @Column(nullable = false)
     private int quantidade;
@@ -37,10 +35,10 @@ public class ItemCarrinho {
     }
 
     /** Para fixtures de teste; em produção o item nasce no upsert {@code somarItem}. */
-    ItemCarrinho(UUID id, Carrinho carrinho, Variante variante, int quantidade) {
+    ItemCarrinho(UUID id, Carrinho carrinho, UUID varianteId, int quantidade) {
         this.id = id;
         this.carrinho = carrinho;
-        this.variante = variante;
+        this.varianteId = varianteId;
         this.quantidade = quantidade;
     }
 
@@ -62,8 +60,8 @@ public class ItemCarrinho {
         return carrinho;
     }
 
-    public Variante getVariante() {
-        return variante;
+    public UUID getVarianteId() {
+        return varianteId;
     }
 
     public int getQuantidade() {

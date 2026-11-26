@@ -59,7 +59,7 @@ public class Carrinho {
     }
 
     public Optional<ItemCarrinho> item(UUID varianteId) {
-        return itens.stream().filter(i -> i.getVariante().getId().equals(varianteId)).findFirst();
+        return itens.stream().filter(i -> i.getVarianteId().equals(varianteId)).findFirst();
     }
 
     void incluir(ItemCarrinho item) {

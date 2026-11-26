@@ -1,5 +1,7 @@
 package app.gestaoIAWpp.produto;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -39,4 +41,17 @@ public interface VarianteRepository extends JpaRepository<Variante, UUID> {
             WHERE id = :varianteId
             """)
     int devolverEstoque(@Param("varianteId") UUID varianteId, @Param("quantidade") int quantidade);
+
+    /**
+     * Resumo em lote para o carrinho: as variantes pelos ids, com produto, valores e opções carregados. Sem filtro
+     * de ativo (RN08): o resumo de um carrinho aberto mostra o preço atual mesmo de variante desativada depois.
+     */
+    @Query("""
+            select distinct v from Variante v
+            join fetch v.produto
+            left join fetch v.valores vo
+            left join fetch vo.opcao
+            where v.id in :ids
+            """)
+    List<Variante> resumoDasVariantes(@Param("ids") Collection<UUID> ids);
 }

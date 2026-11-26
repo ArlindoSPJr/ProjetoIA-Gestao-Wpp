@@ -10,17 +10,16 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import app.gestaoIAWpp.carrinho.CarrinhoService;
 import app.gestaoIAWpp.carrinho.CarrinhoTeste;
 import app.gestaoIAWpp.carrinho.CarrinhoTool;
 import app.gestaoIAWpp.produto.CatalogoTeste;
 import app.gestaoIAWpp.produto.ProdutoService;
 import app.gestaoIAWpp.produto.ProdutoTool;
-import app.gestaoIAWpp.produto.VarianteRepository;
 import com.anthropic.models.messages.OutputConfig;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +53,7 @@ class AgenteSpringAiTest {
     private static final UUID CLIENTE = UUID.randomUUID();
 
     private ChatModel chatModel;
-    private VarianteRepository variantes;
+    private ProdutoService produtos;
     private String pretaM;
     private AgenteSpringAi agente;
 
@@ -63,11 +62,10 @@ class AgenteSpringAiTest {
         chatModel = mock(ChatModel.class);
         when(chatModel.getOptions()).thenReturn(AnthropicChatOptions.builder().build());
         var catalogo = CatalogoTeste.lojaDemo(EMPRESA);
-        variantes = catalogo.varianteRepository();
+        produtos = spy(catalogo.produtoService());
         pretaM = catalogo.variante("Camisa Básica (Preta / M)").getId().toString();
-        var carrinho = new CarrinhoService(variantes, CarrinhoTeste.repositorio(variantes));
-        var tools = new ToolRegistry(List.of(new ProdutoTool(new ProdutoService(catalogo.produtoRepository(), variantes)),
-                new CarrinhoTool(carrinho)));
+        var carrinho = CarrinhoTeste.servico(produtos);
+        var tools = new ToolRegistry(List.of(new ProdutoTool(produtos), new CarrinhoTool(carrinho)));
         agente = new AgenteSpringAi(ChatClient.builder(chatModel),
                 ToolCallingManager.builder().maxTotalToolCalls(10).build(), tools,
                 new AgenteProperties("claude-haiku-5-5", "low", 5));
@@ -186,7 +184,7 @@ class AgenteSpringAiTest {
 
         assertThat(r.texto()).isEqualTo(AgenteSpringAi.MENSAGEM_FALLBACK);
         verify(chatModel, times(5)).call(any(Prompt.class));
-        verify(variantes, times(4)).baixarEstoque(UUID.fromString(pretaM), 1);
+        verify(produtos, times(4)).baixarEstoque(UUID.fromString(pretaM), 1);
         assertThat(r.iteracoes()).hasSize(5);
     }
 
@@ -263,7 +261,7 @@ class AgenteSpringAiTest {
         AgenteResponse r = agente.responder(EMPRESA, CLIENTE, "quero duas");
 
         assertThat(r.texto()).isEqualTo("Quantas unidades?");
-        verify(variantes, never()).baixarEstoque(any(), anyInt());
+        verify(produtos, never()).baixarEstoque(any(), anyInt());
     }
 
     @Test
