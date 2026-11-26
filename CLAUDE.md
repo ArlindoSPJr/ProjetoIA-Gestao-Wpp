@@ -98,17 +98,63 @@ Histórico do fluxo anterior: o plano da demo está em `docs/superpowers/plans/2
 
 ## Estrutura da demo (pacotes sob `app.gestaoIAWpp`)
 
-Cada classe fica no pacote do seu domínio (sem pacotes técnicos como `entity/` ou `service/`); testes no pacote espelho.
+Cada classe fica no pacote do seu módulo (sem pacotes técnicos como `entity/` ou `service/`); testes no pacote espelho. Regras de fronteira entre módulos: seção "Arquitetura: monolito modular".
 
-- `empresa/`: `NumeroWhatsapp` + `NumeroWhatsappRepository` (o número de atendimento, `phone_number_id`, aponta para a empresa) e `NumeroNaoCadastradoException`.
-- `cliente/`: `Cliente`, `ClienteRepository` e `ClienteService` (identifica o cliente por empresa e `user_id`, criando-o com `INSERT ... ON CONFLICT DO NOTHING`).
-- `produto/`: entidades do catálogo (`Produto`, `Opcao`, `ValorOpcao`, `Variante`: o que se vende é a variante, com preço e estoque próprios), `ProdutoRepository`, `VarianteRepository` (`daEmpresa`, e `baixarEstoque`/`devolverEstoque` como `UPDATE` nativo atômico), `ProdutoService` (busca por pontuação tolerante a acento e disponibilidade; a regra de negócio dos produtos mora aqui, não nas tools), exceções, records de domínio e `ProdutoTool` (as tools `consultar_produto` e `consultar_estoque`, só adaptador do `ProdutoService`); `dto/` com as respostas das tools.
-- `carrinho/`: `Carrinho`, `ItemCarrinho`, `StatusCarrinho`, `CarrinhoRepository` (criação do carrinho `ABERTO` e upsert do item em SQL nativo com `ON CONFLICT`) e `CarrinhoService`: carrinho persistido no banco, no máximo um `ABERTO` por cliente; adicionar baixa o estoque e grava o item na mesma transação, remover devolve, o resumo usa o preço atual da variante e o reset da demo devolve o estoque e apaga os carrinhos abertos da empresa. `CarrinhoTool` (as tools do carrinho, só adaptador do `CarrinhoService`); `dto/` com as respostas das tools. As queries nativas de escrita limpam o contexto de persistência (`clearAutomatically`): leia de novo o que precisar depois delas.
-- `ai/`: `AgenteAtendimento` (a porta da IA); `AgenteSpringAi` (monta o `ChatClient` com os advisors e roda o turno: memória por cliente, snapshot/restauração em caso de falha, fallback); `LimiteIteracoesAdvisor` (o `ToolCallingAdvisor` com teto de chamadas à API); `RegistroTurno` (iterações do turno); `ToolRegistry` (junta os `AgentTool` na ordem do `@Order`); `AgentTool` (interface marcadora das tools); `ContextoTool` (lê `empresaId` e `clienteId` do `ToolContext`); `dto/` (os `*Response`). Para criar uma tool: um `@Component` num pacote de domínio que implementa `AgentTool`, com `@Order`; prompt em `src/main/resources/prompts/sistema-atendimento.txt`. A memória de conversa de um cliente fica no `ChatMemory` compartilhado durante o turno; qualquer código futuro que limpe a memória de um cliente (handoff, `ENCERRADA`, expiração) precisa segurar o lock desse cliente (como o `responder` faz). O reset do simulador hoje não segura, o que é aceito na demo.
-- `atendimento/`: `AtendimentoService.processarMensagem(phoneNumberId, userId, telefone, texto)`, entrada agnóstica de canal (o futuro webhook do WhatsApp chama o mesmo serviço): resolve número → empresa → cliente e chama o agente com `empresaId` e `clienteId`.
-- `simulador/`: endpoints REST `/api/simulador/*` (`/mensagens`, `/estado` com o carrinho e as variantes, `/reset`) e a página `src/main/resources/static/index.html`. Usa o número `simulador.phone-number-id` do seed e `user_id = "BR.SIM" + telefone só com dígitos`.
+- `empresa/`: `NumeroWhatsapp` + `NumeroWhatsappRepository` (o número de atendimento, `phone_number_id`, aponta para a empresa), `NumeroWhatsappService` (`empresaDoNumero`: devolve o id da empresa do número ativo) e `NumeroNaoCadastradoException`.
+- `cliente/`: `Cliente` (interna), `ClienteRepository` e `ClienteService` (identifica o cliente por empresa e `user_id`, criando-o com `INSERT ... ON CONFLICT DO NOTHING`). `identificar` e `buscar` devolvem `ClienteResumo` (`id`, `userId`, `telefone`), nunca a entidade.
+- `produto/`: entidades do catálogo (`Produto`, `Opcao`, `ValorOpcao`, `Variante`: o que se vende é a variante, com preço e estoque próprios), `ProdutoRepository`, `VarianteRepository` (`daEmpresa`, e `baixarEstoque`/`devolverEstoque` como `UPDATE` nativo atômico), exceções e records de domínio. `ProdutoService` (busca por pontuação tolerante a acento e disponibilidade; a regra de negócio dos produtos mora aqui, não nas tools) é a única porta de estoque e de dados de variante para fora do módulo: `consultarDisponibilidade`, `baixarEstoque`, `devolverEstoque`, `resumirVariantes`. Entidades e repositórios são internos.
+- `carrinho/`: `Carrinho`, `ItemCarrinho` (guarda só o `varianteId`, sem `@ManyToOne` para `Variante`), `StatusCarrinho`, `CarrinhoRepository` (criação do carrinho `ABERTO` e upsert do item em SQL nativo com `ON CONFLICT`) e `CarrinhoService`: carrinho persistido no banco, no máximo um `ABERTO` por cliente; adicionar baixa o estoque e grava o item na mesma transação, remover devolve, o resumo usa o preço atual da variante e o reset da demo devolve o estoque e apaga os carrinhos abertos da empresa. Estoque e dados de variante vêm da API do `ProdutoService`. As queries nativas de escrita limpam o contexto de persistência (`clearAutomatically`): leia de novo o que precisar depois delas.
+- `ai/`: `AgenteAtendimento` (a porta da IA); `AgenteSpringAi` (monta o `ChatClient` com os advisors e roda o turno: memória por cliente, snapshot/restauração em caso de falha, fallback); `LimiteIteracoesAdvisor` (o `ToolCallingAdvisor` com teto de chamadas à API); `RegistroTurno` (iterações do turno); `ToolRegistry` (junta os `AgentTool` na ordem do `@Order`); `AgentTool` (interface marcadora das tools); `ContextoTool` (lê `empresaId` e `clienteId` do `ToolContext`); `AgenteResponse`, `IteracaoTurnoResponse` e `ToolPedidaResponse` na raiz (API do módulo). `ai/tools/`: `ProdutoTool` (`consultar_produto`, `consultar_estoque`) e `CarrinhoTool`, adaptadores do `ProdutoService` e do `CarrinhoService`; `ai/tools/dto/`: as respostas das tools. Guia em "Como criar uma tool"; prompt em `src/main/resources/prompts/sistema-atendimento.txt`. A memória de conversa de um cliente fica no `ChatMemory` compartilhado durante o turno; qualquer código futuro que limpe a memória de um cliente (handoff, `ENCERRADA`, expiração) precisa segurar o lock desse cliente (como o `responder` faz). O reset do simulador hoje não segura, o que é aceito na demo.
+- `atendimento/`: `AtendimentoService.processarMensagem(phoneNumberId, userId, telefone, texto)`, entrada agnóstica de canal (o futuro webhook do WhatsApp chama o mesmo serviço): resolve número → empresa (via `NumeroWhatsappService`) → cliente e chama o agente com `empresaId` e `clienteId`. Não tem `empresaDoNumero`.
+- `simulador/`: endpoints REST `/api/simulador/*` (`/mensagens`, `/estado` com o carrinho e as variantes, `/reset`) e a página `src/main/resources/static/index.html`. Usa o número `simulador.phone-number-id` do seed e `user_id = "BR.SIM" + telefone só com dígitos`. Chama `NumeroWhatsappService` e recebe `ClienteResumo`.
 
-Regra das camadas: as tools só delegam ao domínio (`ProdutoService`, `CarrinhoService`); nenhuma regra de negócio fica em `ProdutoTool`/`CarrinhoTool`. `empresaId` e `clienteId` vêm do `ToolContext` via `ContextoTool` (preenchido pelo `AgenteSpringAi`), nunca do modelo: o modelo só informa `varianteId`, termo e quantidade.
+Regra das camadas: as tools (`ai/tools/`) só delegam ao domínio (`ProdutoService`, `CarrinhoService`); nenhuma regra de negócio fica em `ProdutoTool`/`CarrinhoTool`. `empresaId` e `clienteId` vêm do `ToolContext` via `ContextoTool` (preenchido pelo `AgenteSpringAi`), nunca do modelo: o modelo só informa `varianteId`, termo e quantidade.
+
+## Arquitetura: monolito modular
+
+Cada pacote de primeiro nível sob `app.gestaoIAWpp` é um módulo do Spring Modulith. Cada um declara em `package-info.java` o `@ApplicationModule(allowedDependencies = ...)` da tabela.
+
+| Módulo | `allowedDependencies` | O que é |
+|---|---|---|
+| `empresa` | nenhum | número de atendimento → empresa |
+| `cliente` | nenhum | identificação do cliente por empresa e `user_id` |
+| `produto` | nenhum | catálogo, busca, disponibilidade e estoque |
+| `carrinho` | `produto` | carrinho persistido; reserva estoque pela API do produto |
+| `ai` | `produto`, `carrinho` | agente, advisor, registry e as tools (`ai/tools/`) |
+| `atendimento` | `empresa`, `cliente`, `ai` | entrada agnóstica de canal |
+| `simulador` | todos os outros | interface da demo (REST + página) |
+
+Regra fixa: `empresa`, `cliente`, `produto` e `carrinho` (os módulos de gestão) nunca dependem de `ai`, `atendimento` ou `simulador`. Eles também não importam `org.springframework.ai`. O Modulith não cobre biblioteca externa, então essa parte vale na review.
+
+- **API de um módulo** = tipos `public` na raiz do pacote: serviços, records, exceções (e, no `ai`, `AgenteAtendimento`, `AgentTool`, `ContextoTool`, os `*Response`). Entidades JPA e repositórios são *package-private*; subpacotes (`ai/tools`, `ai/tools/dto`) são internos, e outro módulo que os use falha no `verify()`.
+- **Construtor de serviço que recebe repositório** (`ProdutoService`, `CarrinhoService`, `ClienteService`, `NumeroWhatsappService`) é *package-private*: o Spring injeta por reflexão. Teste de outro módulo que precisa desses serviços monta-os pelas fábricas dos fixtures (`CatalogoTeste`, `CarrinhoTeste`), nunca com `new`. O construtor sem argumentos das entidades continua `protected` (exigência do Hibernate).
+- **`ModulosTest`** roda no `./mvnw test` (sem Spring e sem banco). Falha em ciclo, tipo interno usado de fora ou dependência fora do `allowedDependencies`, e regenera o diagrama `docs/arquitetura/components.puml`, que vai no mesmo PR.
+
+### Como criar um módulo
+
+(ex.: `pedido`, `conversa`, `atendente`)
+
+1. Pacote de primeiro nível sob `app.gestaoIAWpp`.
+2. `package-info.java` com `@ApplicationModule(allowedDependencies = {...})`, listando só o necessário.
+3. API na raiz (serviço, records, exceções); entidades e repositórios *package-private*.
+4. Uma linha nova na tabela de dependências acima.
+5. `./mvnw test`: o `ModulosTest` valida e regenera o diagrama.
+
+### Como criar uma tool
+
+1. Classe `@Component` em `ai/tools/`, implementando `AgentTool`, com `@Order`; DTOs em `ai/tools/dto/`.
+2. A tool só delega à API pública do domínio; nenhuma regra de negócio fica nela.
+3. Se o domínio ainda não está no `allowedDependencies` do `ai`, acrescente-o (e a tabela acima).
+
+### Quando evoluir a estrutura
+
+| Sinal | Ação |
+|---|---|
+| Um módulo precisa expor um subpacote | `@NamedInterface` no subpacote (a `spring-modulith-api` já está no escopo de compilação) |
+| O `ai` passa a depender de muitos domínios | Separar as tools num módulo `ferramentas` que depende de `ai` e dos domínios |
+| Surge um fluxo assíncrono (ex.: pedido confirmado → notificar) | Eventos do Modulith (`@ApplicationModuleListener`), com o módulo que reage dependendo só do evento |
+| Um módulo fica grande demais para entender de uma vez | Dividir em submódulos, cada um com a sua API |
+| Um domínio passa a importar `org.springframework.ai` | Regra ArchUnit no `ModulosTest` |
 
 ## Stack
 
@@ -122,7 +168,7 @@ Regra das camadas: as tools só delegam ao domínio (`ProdutoService`, `Carrinho
 
 O sistema tem três camadas: chatbot (interface de conversa), agente de IA (executa ações via tools) e sistema de gestão (fonte da verdade sobre clientes, pedidos, inbox do atendente e handoff). Regras que valem para qualquer código novo:
 
-- **O sistema de gestão precisa funcionar sem a IA.** A IA fica isolada atrás de uma interface (ex.: `AgenteAtendimento`), num monolito modular.
+- **O sistema de gestão precisa funcionar sem a IA.** A IA fica isolada atrás de uma interface (ex.: `AgenteAtendimento`), num monolito modular (ver "Arquitetura: monolito modular").
 - Tudo em Java/Spring. Não criar serviço separado em Python.
 - Preço e estoque sempre vêm de tools ou do banco, nunca do texto gerado pelo modelo. O carrinho é persistido no banco e manipulado via tools, não guardado só na memória da LLM.
 - O bot nunca coleta dados de cartão, só a preferência de forma de pagamento. Um atendente humano valida o pedido inteiro antes do pagamento.
