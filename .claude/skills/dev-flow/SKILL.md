@@ -58,13 +58,13 @@ flowchart TD
 
 ## Pré-requisitos
 Confira antes da etapa 3 (execução):
-- **Orca rodando.** Rode `orca status --json`. Se o Orca estiver indisponível (app fechado, runtime desconectado), avise o humano e pare. **Não execute o ticket na sua própria sessão.**
+- **Orca rodando.** Rode `orca status --json` e confira `result.app.running: true` e `result.runtime.reachable: true`. Se o Orca estiver indisponível (comando falha, app fechado, runtime desconectado), avise o humano e pare. **Não execute o ticket na sua própria sessão.**
 - **Configuração do GitHub (feita pelo humano no painel):** branch protection na `main` (exigir PR e CI verde) e "Automatically delete head branches". Se faltar, avise o humano; você não altera essas configurações.
-- **Labels** `aguardando-aprovacao` e `ready-for-agent` (o `needs-human` já é criado pelo `sonar-fix.yml`). Se faltarem, crie:
+- **Labels** `aguardando-aprovacao`, `ready-for-agent` e `needs-human`. Confira com `gh label list`. Crie só os que faltarem (o `needs-human` normalmente já existe, criado pelo `sonar-fix.yml`; não o recrie):
   ```bash
-  gh label create aguardando-aprovacao --description "Ticket aguardando aprovação do humano" --force
-  gh label create ready-for-agent --description "Ticket liberado para um worker" --force
-  gh label create needs-human --description "Precisa de decisão humana" --force
+  gh label create aguardando-aprovacao --description "Ticket aguardando aprovação do humano"
+  gh label create ready-for-agent --description "Ticket liberado para um worker"
+  gh label create needs-human --description "Precisa de decisão humana"
   ```
 
 ## 0. Trivial e bug
@@ -87,10 +87,10 @@ Confira antes da etapa 3 (execução):
   - Só proponha um pattern se a solução simples falhar num caso concreto desta spec. Nesse caso, preencha a **Comparação** do template e mostre ao humano no grill, antes da aprovação.
   - Sem aprovação explícita do humano para o pattern, fica a solução simples.
 - **Pare aqui até o humano escrever "aprovado".** Silêncio não é aprovação. Nada é feito depois da spec sem esse "aprovado". Ao aprovar, mude `Status` para `aprovada (AAAA-MM-DD)`.
-- **A spec aprovada é imutável.** Se um worker precisar mudá-la, ele escala (etapa 3). O humano decide a alteração, e você aplica a mesma alteração, com o mesmo commit, em todas as branches de ticket abertas.
+- **A spec aprovada é imutável.** Se um worker precisar mudá-la, ele escala (etapa 3). O humano decide a alteração, e você aplica a mesma alteração em todas as branches de ticket abertas.
 
 ## 2. Tickets
-Cada ticket é uma **sub-issue da issue pai** da feature. Sem trechos de código no ticket.
+Cada ticket é uma **sub-issue da issue pai** da feature. Se a feature ainda não tem issue pai, crie-a antes (`gh issue create`, com o objetivo e o link da spec). Sem trechos de código no ticket.
 
 ### Como cortar
 Não chame a skill `to-tickets`; as regras dela estão aqui:
@@ -146,7 +146,7 @@ Bloqueado por: #<nº> (vínculo `blocked-by` nativo; escreva aqui só se o vínc
    - Sub-issue: `POST repos/{owner}/{repo}/issues/<nº do pai>/sub_issues` com o campo `sub_issue_id`.
    - Bloqueio: o endpoint de dependências da issue, `POST repos/{owner}/{repo}/issues/<nº do ticket>/dependencies/blocked_by`, com o campo `issue_id` do bloqueador.
    - Esses campos recebem o **`id` interno** da issue, não o número: `gh api repos/{owner}/{repo}/issues/<nº> --jq .id`. Passe-o como inteiro (`-F`).
-3. Confirme com `gh issue view <nº>` que `parent` e `blocked-by` aparecem. Se o vínculo nativo falhar, escreva os bloqueadores na seção `## Dependências` do corpo e avise o humano.
+3. Confirme os vínculos: `gh api repos/{owner}/{repo}/issues/<nº>/parent --jq .number` deve devolver o pai, e `gh api repos/{owner}/{repo}/issues/<nº>/dependencies/blocked_by --jq '.[].number'` os bloqueadores. Se o vínculo nativo falhar, escreva os bloqueadores na seção `## Dependências` do corpo e avise o humano.
 4. Aprovação:
    - **Um ticket só:** a aprovação da spec basta. Troque o label para `ready-for-agent` (`gh issue edit <nº> --remove-label aguardando-aprovacao --add-label ready-for-agent`).
    - **Mais de um ticket:** mostre a lista ao humano (título, tamanho, bloqueios, linhas da matriz) e **pare até ele escrever "aprovado" para os tickets**. Pedido de ajuste: volte ao corte. Com o "aprovado", troque o label de todos para `ready-for-agent`.
@@ -163,14 +163,14 @@ Você continua sendo o coordenador (a sessão do grill, da spec e dos tickets). 
 ### Para cada ticket que sai da fila
 1. Atualize a `main`: `git fetch origin` e parta de `origin/main`.
 2. Crie a branch `<tipo>/<nº da sub-issue>-<slug-curto>`, com tipo `feat`, `fix` ou `refactor` (prefactor). Ex.: `feat/21-carrinho-remover-item`.
-3. Se a spec ainda não está na `main`, commite-a nessa branch (cópia idêntica em cada branch de ticket; não conflita). Commits usam `Refs #<nº>`.
+3. Se a spec ainda não está na `main`, copie o arquivo da spec aprovada (da sua working tree) para a branch e commite-o (cópia idêntica em cada branch de ticket; não conflita). Commits usam `Refs #<nº>`.
 4. Crie a worktree do Orca com o **mesmo nome** da branch, a partir dela.
 5. Lance o worker com o prompt abaixo, preenchido.
-6. Acompanhe os eventos `worker_done`, `escalation` e `question`. Responda você o que a spec e o ticket respondem; o que só o humano decide, pergunte a ele.
+6. Acompanhe as mensagens do worker pelo Orca: perguntas (`ask`, que você responde com `reply`) e o `worker_done` final. Escalação e aviso de divisão chegam como `ask` (ou como `worker_done` com status `escalado` e o motivo). Responda você o que a spec e o ticket respondem; o que só o humano decide, pergunte a ele.
 
 ### Divisão de ticket
 Quando o worker avisa que o ticket passa de ~700 linhas de lógica:
-- **A divisão só redistribui o escopo** (mesmos CA/RF, linhas da matriz e alterações previstas do ticket original): crie a sub-issue nova com o template, `ready-for-agent`, **bloqueada pelo ticket atual**, e avise o humano. Não precisa de aprovação. Retire do ticket atual o que foi para a nova.
+- **A divisão só redistribui o escopo** (mesmos CA/RF, linhas da matriz e alterações previstas do ticket original): crie a sub-issue nova com o template, `ready-for-agent`, **bloqueada pelo ticket atual**, e avise o humano. Não precisa de aprovação. A sub-issue nova recebe só o escopo **ainda não escrito**; edite o corpo do ticket atual para refletir o que ficou nele. Código já pronto não é removido.
 - **A divisão traz escopo novo:** é escalação (abaixo).
 
 ### Escalação
@@ -195,8 +195,11 @@ Passos, na ordem:
    Mantenha as reviews por tarefa. NÃO rode a review final do subagent-driven-development
    nem superpowers:finishing-a-development-branch.
    Testes a partir das linhas da matriz deste ticket, seguindo .claude/rules/testing.md.
-3. Meça as linhas de lógica: git diff --numstat origin/main...HEAD -- src/main/java
-   Acima de ~700: pare e avise o coordenador (divisão). Nunca remova nem comprima código para caber.
+3. Depois de CADA tarefa, meça as linhas de lógica (some só a 1ª coluna, a de linhas adicionadas):
+   git diff --numstat origin/main...HEAD -- src/main/java
+   Se a soma, mais o que falta escrever, passar de ~700: pare num ponto coerente (tarefa
+   concluída, testes verdes) e avise o coordenador por ask, dizendo o que ainda não foi escrito.
+   Esse resto vai para a sub-issue nova. Nunca remova nem comprima código para caber.
 4. Rode ./mvnw clean verify e ./mvnw test-compile org.pitest:pitest-maven:mutationCoverage.
    Se falhar e você não resolver: escale.
 5. Chame um subagente blind-reviewer NOVO com a mensagem exata, e nada mais:
@@ -213,7 +216,8 @@ Passos, na ordem:
    - linhas de lógica medidas
 7. Envie worker_done com o link do PR, os arquivos modificados e as pendências.
 
-Escale ao coordenador quando: a review reprovar na 3ª rodada, verify ou PIT não passarem,
+Escale ao coordenador (por ask pelo Orca, com o motivo; se não puder continuar, worker_done
+com status "escalado") quando: a review reprovar na 3ª rodada, verify ou PIT não passarem,
 a spec precisar mudar, ou a divisão trouxer escopo novo.
 
 Siga as Proibições e a validação de Dependências do CLAUDE.md.
