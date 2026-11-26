@@ -60,12 +60,6 @@ flowchart TD
 Confira antes da etapa 3 (execução):
 - **Orca rodando.** Rode `orca status --json` e confira `result.app.running: true` e `result.runtime.reachable: true`. Se o Orca estiver indisponível (comando falha, app fechado, runtime desconectado), avise o humano e pare. **Não execute o ticket na sua própria sessão.**
 - **Configuração do GitHub (feita pelo humano no painel):** branch protection na `main` (exigir PR e CI verde) e "Automatically delete head branches". Se faltar, avise o humano; você não altera essas configurações.
-- **Labels** `aguardando-aprovacao`, `ready-for-agent` e `needs-human`. Confira com `gh label list`. Crie só os que faltarem (o `needs-human` normalmente já existe, criado pelo `sonar-fix.yml`; não o recrie):
-  ```bash
-  gh label create aguardando-aprovacao --description "Ticket aguardando aprovação do humano"
-  gh label create ready-for-agent --description "Ticket liberado para um worker"
-  gh label create needs-human --description "Precisa de decisão humana"
-  ```
 
 ## 0. Trivial e bug
 - **Toda implementação** (feature, bug, refactor, mudança de comportamento) passa por esta skill.
@@ -138,7 +132,13 @@ Bloqueado por: #<nº> (vínculo `blocked-by` nativo; escreva aqui só se o vínc
 - Confira as versões de migration reservadas (nenhuma repetida) e os bloqueios por arquivo compartilhado.
 
 ### Publicar
-1. Crie cada sub-issue com o label `aguardando-aprovacao`:
+0. **Labels** `aguardando-aprovacao`, `ready-for-agent` e `needs-human`: confira com `gh label list` e crie os que faltarem (o `needs-human` pode já existir, criado pelo `sonar-fix.yml`):
+   ```bash
+   gh label create aguardando-aprovacao --description "Ticket aguardando aprovação do humano"
+   gh label create ready-for-agent --description "Ticket liberado para um worker"
+   gh label create needs-human --description "Precisa de decisão humana"
+   ```
+1. Crie cada sub-issue com o label `aguardando-aprovacao` e adicione-a ao Projects **Kanban** (`gh issue edit <nº> --add-project "Kanban"`; se o token não tiver o escopo `project`, avise o humano e siga):
    ```bash
    gh issue create --title "<tipo>: <título curto>" --body-file <arquivo-do-corpo>.md --label aguardando-aprovacao
    ```
@@ -200,6 +200,7 @@ Passos, na ordem:
    Se a soma passar de ~700: pare num ponto coerente (tarefa
    concluída, testes verdes) e avise o coordenador por ask, dizendo o que ainda não foi escrito.
    Esse resto vai para a sub-issue nova. Nunca remova nem comprima código para caber.
+   Depois da resposta do coordenador, siga para o passo 4 só com o que já foi escrito.
 4. Rode ./mvnw clean verify e ./mvnw test-compile org.pitest:pitest-maven:mutationCoverage.
    Se falhar e você não resolver: escale.
 5. Chame um subagente blind-reviewer NOVO com a mensagem exata, e nada mais:
