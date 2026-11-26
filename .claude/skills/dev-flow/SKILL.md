@@ -158,6 +158,18 @@ Todo ticket é executado por um **worker do Orca**, em sessão e worktree própr
 
 Você continua sendo o coordenador (a sessão do grill, da spec e dos tickets). O estado mora no GitHub: uma sessão nova consegue retomar a coordenação lendo só a issue pai e as sub-issues (`gh issue view <pai>`, labels, `blocked-by`, PRs abertos).
 
+### Modelos
+Opus onde um erro custa caro (decisão e review final); volume de código no Sonnet ou no Haiku, poupando o limite da assinatura com até 3 workers.
+
+| Papel | Modelo | Como |
+|---|---|---|
+| Coordenador (grill, spec, tickets) | Opus, effort alto | modelo da sessão; se ela estiver em outro, avise o humano antes do grill |
+| Worker (plano do ticket + coordenação do subagent-driven) | Sonnet | `--model claude-sonnet-5-5 --effort high` ao lançar pelo Orca |
+| Implementadores do subagent-driven | o mais barato que dá conta: Haiku para tarefa mecânica, Sonnet para integração entre arquivos | regra de escolha de modelo da própria skill |
+| Reviews por tarefa | Sonnet | idem |
+| `blind-reviewer` | Opus | fixado no frontmatter do agente (`model: opus`) |
+| `sonar-fix` (CI) | definido no `sonar-fix.yml` | fora desta skill |
+
 ### Fila
 - **No máximo 3 workers ao mesmo tempo.** Os demais tickets esperam na fila.
 - Só entra na fila ticket `ready-for-agent` sem bloqueador aberto (todos os bloqueadores mergeados).
@@ -167,7 +179,7 @@ Você continua sendo o coordenador (a sessão do grill, da spec e dos tickets). 
 2. Crie a branch `<tipo>/<nº da sub-issue>-<slug-curto>`, com tipo `feat`, `fix` ou `refactor` (prefactor). Ex.: `feat/21-carrinho-remover-item`.
 3. Se a spec ainda não está na `main`, copie o arquivo da spec aprovada (da sua working tree) para a branch e commite-o (cópia idêntica em cada branch de ticket; não conflita). Commits usam `Refs #<nº>`.
 4. Crie a worktree do Orca com o **mesmo nome** da branch, a partir dela.
-5. Lance o worker com o prompt abaixo, preenchido.
+5. Lance o worker com o prompt abaixo, preenchido, e o modelo da seção "Modelos" (`--model claude-sonnet-5-5 --effort high` no comando do Orca que cria a worktree ou lança o agente).
 6. Acompanhe as mensagens do worker pelo Orca: perguntas (`ask`, que você responde com `reply`) e o `worker_done` final. Escalação e aviso de divisão chegam como `ask` (ou como `worker_done` com status `escalado` e o motivo). Responda você o que a spec e o ticket respondem; o que só o humano decide, pergunte a ele.
 
 ### Divisão de ticket
