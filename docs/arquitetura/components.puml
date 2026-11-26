@@ -1,0 +1,46 @@
+@startuml
+title <size:24>GestaoIaWppApplication</size>
+
+set separator none
+top to bottom direction
+
+<style>
+  root {
+    BackgroundColor: #ffffff
+    FontColor: #444444
+  }
+</style>
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Component>
+
+System_Boundary("GestaoIaWppApplication_boundary", "GestaoIaWppApplication", $tags="") {
+  Container_Boundary("GestaoIaWppApplication.GestaoIaWppApplication_boundary", "GestaoIaWppApplication", $tags="") {
+    Component(GestaoIaWppApplication.GestaoIaWppApplication.Cliente, "Cliente", $techn="Module", $descr="", $tags="", $link="")
+    Component(GestaoIaWppApplication.GestaoIaWppApplication.Empresa, "Empresa", $techn="Module", $descr="", $tags="", $link="")
+    Component(GestaoIaWppApplication.GestaoIaWppApplication.Produto, "Produto", $techn="Module", $descr="", $tags="", $link="")
+    Component(GestaoIaWppApplication.GestaoIaWppApplication.Carrinho, "Carrinho", $techn="Module", $descr="", $tags="", $link="")
+    Component(GestaoIaWppApplication.GestaoIaWppApplication.Ai, "Ai", $techn="Module", $descr="", $tags="", $link="")
+    Component(GestaoIaWppApplication.GestaoIaWppApplication.Atendimento, "Atendimento", $techn="Module", $descr="", $tags="", $link="")
+    Component(GestaoIaWppApplication.GestaoIaWppApplication.Simulador, "Simulador", $techn="Module", $descr="", $tags="", $link="")
+  }
+
+}
+
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Carrinho, GestaoIaWppApplication.GestaoIaWppApplication.Produto, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Ai, GestaoIaWppApplication.GestaoIaWppApplication.Carrinho, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Ai, GestaoIaWppApplication.GestaoIaWppApplication.Produto, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Atendimento, GestaoIaWppApplication.GestaoIaWppApplication.Empresa, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Atendimento, GestaoIaWppApplication.GestaoIaWppApplication.Cliente, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Atendimento, GestaoIaWppApplication.GestaoIaWppApplication.Ai, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Simulador, GestaoIaWppApplication.GestaoIaWppApplication.Atendimento, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Simulador, GestaoIaWppApplication.GestaoIaWppApplication.Empresa, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Simulador, GestaoIaWppApplication.GestaoIaWppApplication.Cliente, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Simulador, GestaoIaWppApplication.GestaoIaWppApplication.Ai, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Simulador, GestaoIaWppApplication.GestaoIaWppApplication.Carrinho, "uses", $techn="", $tags="", $link="")
+Rel(GestaoIaWppApplication.GestaoIaWppApplication.Simulador, GestaoIaWppApplication.GestaoIaWppApplication.Produto, "uses", $techn="", $tags="", $link="")
+
+SHOW_LEGEND(true)
+hide stereotypes
+@enduml

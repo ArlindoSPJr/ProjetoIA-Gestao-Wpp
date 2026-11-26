@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
-public interface VarianteRepository extends JpaRepository<Variante, UUID> {
+interface VarianteRepository extends JpaRepository<Variante, UUID> {
 
     /** Variante ativa, de produto ativo da empresa, com produto, valores e opções carregados (RN06, RN07). */
     @Query("""

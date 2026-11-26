@@ -44,8 +44,8 @@ class CarrinhoServiceTest {
         produtos = spy(catalogo.produtoService());
         carrinhos = CarrinhoTeste.repositorio();
         carrinho = new CarrinhoService(produtos, carrinhos);
-        pretaM = catalogo.variante("Camisa Básica (Preta / M)").getId();
-        brancaM = catalogo.variante("Camisa Básica (Branca / M)").getId();
+        pretaM = catalogo.idDaVariante("Camisa Básica (Preta / M)");
+        brancaM = catalogo.idDaVariante("Camisa Básica (Branca / M)");
     }
 
     @Test

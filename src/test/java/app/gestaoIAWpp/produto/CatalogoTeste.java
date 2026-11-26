@@ -103,6 +103,16 @@ public final class CatalogoTeste {
                 .findFirst().orElseThrow();
     }
 
+    /** Id da variante cujo nome completo bate com o informado (para testes fora do pacote produto). */
+    public UUID idDaVariante(String nomeCompleto) {
+        return variante(nomeCompleto).getId();
+    }
+
+    /** Id do produto na posição dada do catálogo (para testes fora do pacote produto). */
+    public UUID idDoProduto(int indice) {
+        return produtos.get(indice).getId();
+    }
+
     /** O {@link ProdutoService} real sobre os repositórios mockados deste catálogo. */
     public ProdutoService produtoService() {
         return new ProdutoService(produtoRepository(), varianteRepository());

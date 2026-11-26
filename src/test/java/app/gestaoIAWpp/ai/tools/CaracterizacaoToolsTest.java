@@ -49,7 +49,7 @@ class CaracterizacaoToolsTest {
     }
 
     private String id(String nomeCompleto) {
-        return catalogo.variante(nomeCompleto).getId().toString();
+        return catalogo.idDaVariante(nomeCompleto).toString();
     }
 
     private String carrinhoPretaM(int quantidade, String subtotal) {
@@ -119,8 +119,8 @@ class CaracterizacaoToolsTest {
     @Test
     @DisplayName("D5 consultar_produto devolve produtos com a lista de variantes")
     void consultarProdutoCamisaPreta() {
-        String basica = catalogo.produtos().get(0).getId().toString();
-        String polo = catalogo.produtos().get(1).getId().toString();
+        String basica = catalogo.idDoProduto(0).toString();
+        String polo = catalogo.idDoProduto(1).toString();
 
         String saida = callback("consultar_produto").call("{\"termo\":\"camisa preta\"}", ctx);
 

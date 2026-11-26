@@ -8,7 +8,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "numero_whatsapp")
-public class NumeroWhatsapp {
+class NumeroWhatsapp {
 
 	@Id
 	private UUID id;

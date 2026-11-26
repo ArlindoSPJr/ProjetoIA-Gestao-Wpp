@@ -21,7 +21,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "carrinho")
-public class Carrinho {
+class Carrinho {
 
     @Id
     private UUID id;

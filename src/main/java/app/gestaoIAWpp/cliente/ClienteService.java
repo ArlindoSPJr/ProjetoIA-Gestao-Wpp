@@ -10,7 +10,7 @@ public class ClienteService {
 
 	private final ClienteRepository repository;
 
-	public ClienteService(ClienteRepository repository) {
+	ClienteService(ClienteRepository repository) {
 		this.repository = repository;
 	}
 

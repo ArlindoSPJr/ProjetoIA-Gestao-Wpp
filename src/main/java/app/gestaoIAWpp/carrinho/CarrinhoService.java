@@ -33,7 +33,7 @@ public class CarrinhoService {
     private final ProdutoService produtos;
     private final CarrinhoRepository carrinhos;
 
-    public CarrinhoService(ProdutoService produtos, CarrinhoRepository carrinhos) {
+    CarrinhoService(ProdutoService produtos, CarrinhoRepository carrinhos) {
         this.produtos = produtos;
         this.carrinhos = carrinhos;
     }

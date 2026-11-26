@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 /** O item vendável: uma combinação de valores de opção do produto, com preço e estoque próprios. */
 @Entity
 @Table(name = "variante")
-public class Variante {
+class Variante {
 
     @Id
     private UUID id;
