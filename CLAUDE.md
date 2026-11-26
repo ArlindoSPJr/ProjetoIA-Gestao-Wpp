@@ -10,8 +10,10 @@ Projeto em fase inicial: uma demo do agente de atendimento está sendo construí
 
 ## Fluxo de trabalho
 
-- Feature nova, bug ou mudança de comportamento: use a skill **spec-flow**.
-- Mudança trivial (texto, log, renomear): pode ir direto, mas os comandos da seção "Comandos" precisam passar.
+- **Toda** implementação (feature, bug, refactor, mudança de comportamento) passa pela skill **dev-flow**: grill, spec aprovada, tickets (sub-issues de ~500 linhas de lógica), um worker do Orca por ticket com TDD e review cega, PR direto na `main`.
+- A única exceção é mudança trivial (texto, log, renomear, ajuste de doc): branch + PR direto, com os comandos da seção "Comandos" passando.
+- Nenhum agente faz merge: todo PR passa pelo merge do humano.
+- Pré-requisitos no GitHub, configurados pelo humano: branch protection na `main` (exigir PR e CI verde) e "Automatically delete head branches".
 
 ## Testes
 
@@ -92,7 +94,7 @@ Modelo, effort e limite de iterações do agente ficam no bloco `agente:` do `ap
 
 O limite do loop tem duas camadas: `agente.max-iteracoes` (principal, 5 chamadas à API por turno, aplicado pelo `LimiteIteracoesAdvisor`) e `spring.ai.tools.limits.max-total-tool-calls` (rede de segurança, 10 tools por turno, do próprio Spring AI). Estourar qualquer uma devolve a mensagem de fallback e restaura a memória ao estado de antes do turno.
 
-Plano da demo: `docs/superpowers/plans/2026-11-20-demo-agente-atendimento.md` (spec em `docs/superpowers/specs/`).
+Histórico do fluxo anterior: o plano da demo está em `docs/superpowers/plans/2026-11-20-demo-agente-atendimento.md` (spec em `docs/superpowers/specs/`). `docs/superpowers/`, `docs/plans/` e `docs/reviews/` são registros de antes do dev-flow.
 
 ## Estrutura da demo (pacotes sob `app.gestaoIAWpp`)
 
