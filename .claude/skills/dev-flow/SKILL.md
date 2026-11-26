@@ -7,6 +7,8 @@ description: Fluxo de desenvolvimento deste repositório para TODA implementaç�
 
 O humano participa da ideia, da spec, da validação dos tickets e de cada merge. Você é o **coordenador**: conduz o grill, escreve a spec, cria os tickets e lança um worker do Orca por ticket. Siga as etapas na ordem e não pule nenhuma. **Nenhum agente faz merge**, nem você, nem os workers: o merge é sempre do humano.
 
+## Fluxos
+
 ### Fluxo principal
 ```mermaid
 flowchart TD
@@ -200,7 +202,8 @@ Passos, na ordem:
    Se a soma passar de ~700: pare num ponto coerente (tarefa
    concluída, testes verdes) e avise o coordenador por ask, dizendo o que ainda não foi escrito.
    Esse resto vai para a sub-issue nova. Nunca remova nem comprima código para caber.
-   Depois da resposta do coordenador, siga para o passo 4 só com o que já foi escrito.
+   Depois da resposta do coordenador, não resta tarefa deste ticket a implementar (o resto foi
+   para a sub-issue nova): siga para o passo 4 com o que já foi escrito.
 4. Rode ./mvnw clean verify e ./mvnw test-compile org.pitest:pitest-maven:mutationCoverage.
    Se falhar e você não resolver: escale.
 5. Chame um subagente blind-reviewer NOVO com a mensagem exata, e nada mais:
