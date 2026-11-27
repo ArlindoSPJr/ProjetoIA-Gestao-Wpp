@@ -5,7 +5,7 @@ Vale para todo agente que cria, altera ou avalia testes. Os comandos ficam no CL
 ## Quem faz o quê
 | Papel | Responsabilidade |
 |---|---|
-| Spec (humano + grilling) | Define a **matriz de testes**: quais caminhos precisam de teste, antes de existir código. |
+| Spec (humano + `/grill-with-docs` + `/to-spec`) | Define a **matriz de testes**: quais caminhos precisam de teste, antes de existir código. |
 | Coordenador (dev-flow) | Distribui cada linha da matriz para exatamente um ticket. |
 | Worker (subagent-driven-development + TDD) | Escreve os testes **antes** do código, a partir das linhas da matriz do seu ticket, um caminho por vez. |
 | blind-reviewer | **Não escreve testes.** Verifica se cada linha da matriz do ticket tem teste e se os testes provam algo. |

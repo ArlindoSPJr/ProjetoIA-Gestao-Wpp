@@ -10,7 +10,7 @@ Projeto em fase inicial: uma demo do agente de atendimento está sendo construí
 
 ## Fluxo de trabalho
 
-- **Toda** implementação (feature, bug, refactor, mudança de comportamento) passa pela skill **dev-flow**: grill, spec aprovada, tickets (sub-issues de ~500 linhas de lógica), um worker do Orca por ticket com TDD e review cega, PR direto na `main`.
+- **Toda** implementação (feature, bug, refactor, mudança de comportamento) passa pela skill **dev-flow**: grill (`/grill-with-docs`), spec aprovada (`/to-spec`), tickets (`/to-tickets`, sub-issues de ~500 linhas de lógica), um worker do Orca por ticket com TDD e review cega, PR direto na `main`.
 - A única exceção é mudança trivial (texto, log, renomear, ajuste de doc): branch + PR direto, com os comandos da seção "Comandos" passando.
 - Nenhum agente faz merge: todo PR passa pelo merge do humano.
 - Pré-requisitos no GitHub, configurados pelo humano: branch protection na `main` (exigir PR e CI verde) e "Automatically delete head branches".
