@@ -1,6 +1,6 @@
 ---
 name: dev-flow
-description: Fluxo de desenvolvimento deste repositório para TODA implementação (feature, bug, refactor, mudança de comportamento) - grill, spec aprovada, tickets como sub-issues do GitHub de ~500 linhas de lógica, um worker do Orca por ticket com TDD e review cega, PR direto na main e merge humano. Use antes de escrever código, plano ou ticket. Só mudança trivial (texto, log, renomear, doc) fica de fora.
+description: Fluxo de desenvolvimento deste repositório para TODA implementação (feature, bug, refactor, mudança de comportamento) - grill (/grill-with-docs), spec aprovada (/to-spec), tickets (/to-tickets) como sub-issues do GitHub de ~500 linhas de lógica, um worker do Orca por ticket com TDD e review cega, PR direto na main e merge humano. Use antes de escrever código, plano ou ticket. Só mudança trivial (texto, log, renomear, doc) fica de fora.
 ---
 
 # dev-flow
@@ -16,11 +16,11 @@ flowchart TD
     T -- sim --> TR[Branch + PR direto<br/>comandos do CLAUDE.md passando] --> MG
     T -- não --> Z{Bug?}
     Z -- sim --> Y[diagnosing-bugs até a causa confirmada] --> G
-    Z -- não --> G[Grill com grilling<br/>pesquisa interna; research quando faltar fato externo]
-    G --> S[Spec no template<br/>docs/specs/AAAA-MM-DD-slug.md]
+    Z -- não --> G[Humano digita /grill-with-docs<br/>grill + GLOSSARY.md e ADRs<br/>research quando faltar fato externo]
+    G --> S[Humano digita /to-spec<br/>seams confirmadas, spec no template<br/>docs/specs/AAAA-MM-DD-slug.md]
     S --> AP{Humano escreveu<br/>aprovado?}
     AP -- não --> G
-    AP -- sim --> K[Coordenador cria os tickets<br/>sub-issues da issue pai<br/>label aguardando-aprovacao]
+    AP -- sim --> K[Humano digita /to-tickets<br/>sub-issues da issue pai<br/>label aguardando-aprovacao]
     K --> V{Matriz: cada linha<br/>em exatamente 1 ticket?}
     V -- não --> K
     V -- sim --> N{Mais de 1 ticket?}
@@ -69,11 +69,22 @@ Confira antes da etapa 3 (execução):
 - Qualquer coisa que não seja trivial segue o fluxo completo, a partir da etapa 1.
 - **Bug:** antes da etapa 1, use a skill **diagnosing-bugs** até ter um loop que reproduz o sintoma e a causa confirmada. A spec registra a causa, e a Matriz de testes inclui o teste de regressão.
 
+## Quem dispara cada etapa
+`/grill-with-docs`, `/to-spec` e `/to-tickets` só podem ser chamadas pelo humano (`disable-model-invocation`). Ao terminar uma etapa, diga qual comando ele digita para a próxima; não pule a etapa nem a faça "por fora" da skill. Exceção: se o humano pedir para seguir sem o comando, conduza o grill com as skills **grilling** + **domain-modeling** (é o que a `grill-with-docs` faz) e a spec e os tickets seguindo as seções 1 e 2 abaixo.
+
+Nas três skills, as regras deste arquivo valem sobre as delas.
+
 ## 1. Grill e spec
-- Entreviste o humano com a skill **grilling**. **Não use `superpowers:brainstorming`.** (A `grill-me` só pode ser chamada pelo humano; ela delega para a `grilling`.)
+### Grill (`/grill-with-docs`)
+- A `grill-with-docs` chama **grilling** (a entrevista) e **domain-modeling** (glossário e ADRs). **Não use `superpowers:brainstorming`.**
 - Faça a pesquisa interna (código, schema, migrations) dentro do grill. Use a skill **research** só quando faltar um fato externo (documentação, API).
-- Escreva a spec a partir de [spec-template.md](spec-template.md), em `docs/specs/AAAA-MM-DD-<slug>.md`.
-- Todo fluxo tem fluxograma Mermaid, inclusive os caminhos de erro. Toda decisão cara de desfazer vai na tabela de decisões.
+- **Glossário:** `GLOSSARY.md` na raiz, em português, com o vocabulário de domínio (pedido, carrinho, `AGUARDANDO_VALIDACAO`...). Atualize-o durante o grill, quando um termo for resolvido; vai no mesmo PR da spec ou do primeiro ticket. Sem detalhe de implementação.
+- **ADR vs. tabela de decisões da spec:** a decisão que vale só para esta feature fica na tabela "Decisões importantes" da spec. A decisão que vai valer para features futuras e é cara de desfazer (arquitetura, contrato entre módulos, escolha de tecnologia) vira ADR em `docs/adr/NNNN-<slug>.md`, e a linha da tabela aponta para ela. Use ADR com parcimônia, como a domain-modeling manda.
+
+### Spec (`/to-spec`)
+- A `to-spec` não entrevista: sintetiza o grill. Antes de escrever, ela confirma com o humano as **seams** de teste (onde a feature vai ser testada); elas alimentam a Matriz de testes.
+- Escreva a spec a partir de [spec-template.md](spec-template.md), em `docs/specs/AAAA-MM-DD-<slug>.md`, com `Status: rascunho`. A spec é arquivo no repositório, não issue.
+- Todo fluxo tem fluxograma Mermaid, inclusive os caminhos de erro. Toda decisão cara de desfazer vai na tabela de decisões (ou em ADR, como acima).
 - Cada critério de aceite precisa ser testável. A spec tem Matriz de testes (ver `.claude/rules/testing.md`).
 - Se a feature cria 3+ classes, um módulo novo ou muda uma interface pública, preencha a seção **Design estrutural**:
   - Antes de propor classes, leia o código existente da área (Grep/Glob) só para reaproveitar o que já funciona e evitar duplicação.
@@ -85,11 +96,12 @@ Confira antes da etapa 3 (execução):
 - **Pare aqui até o humano escrever "aprovado".** Silêncio não é aprovação. Nada é feito depois da spec sem esse "aprovado". Ao aprovar, mude `Status` para `aprovada (AAAA-MM-DD)`.
 - **A spec aprovada é imutável.** Se um worker precisar mudá-la, ele escala (etapa 3). O humano decide a alteração, e você aplica a mesma alteração em todas as branches de ticket abertas.
 
-## 2. Tickets
+## 2. Tickets (`/to-tickets`)
+A `to-tickets` corta, apresenta o corte ao humano e publica seguindo esta seção (template, labels, checagens e comandos `gh` daqui, não os dela).
+
 Cada ticket é uma **sub-issue da issue pai** da feature. Se a feature ainda não tem issue pai, crie-a antes (`gh issue create`, com o objetivo e o link da spec). Sem trechos de código no ticket.
 
 ### Como cortar
-Não chame a skill `to-tickets`; as regras dela estão aqui:
 - **Fatia vertical:** cada ticket funciona e é testável sozinho (do endpoint ou da tool até o banco, o que o CA pedir). Nada de ticket "só entidades" ou "só testes".
 - **Prefactor primeiro:** se uma refatoração prepara o terreno, ela é um ticket próprio, do tipo `refactor`, e bloqueia os que dependem dela.
 - **Refactor largo segue expand–contract:** um ticket adiciona o novo ao lado do antigo, os seguintes migram os usos, o último remove o antigo. A `main` fica verde entre um e outro.
